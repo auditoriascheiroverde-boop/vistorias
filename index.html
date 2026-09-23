@@ -1,0 +1,1630 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vistorias · Cheiro Verde Ambiental</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --forest:#1E5B3A;
+    --forest-dark:#153F28;
+    --moss:#4C7A4E;
+    --moss-bg:#E7F0E3;
+    --clay:#B23A2E;
+    --clay-bg:#F7E7E3;
+    --amber:#C98A2C;
+    --amber-bg:#F8EDDA;
+    --paper:#F5F3EC;
+    --paper-raised:#FFFFFF;
+    --graphite:#262922;
+    --graphite-soft:#5B6055;
+    --line:#DEDACB;
+    --radius:14px;
+    --shadow:0 1px 2px rgba(38,41,34,0.06), 0 4px 14px rgba(38,41,34,0.06);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--graphite);
+    font-family:'Inter',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .display{font-family:'Space Grotesk',sans-serif;}
+  #app{max-width:560px;margin:0 auto;min-height:100vh;background:var(--paper);position:relative;display:flex;flex-direction:column;}
+
+  /* ---- Top bar ---- */
+  .topbar{
+    position:sticky;top:0;z-index:20;
+    background:var(--forest);
+    color:#fff;
+    padding:14px 16px calc(14px + env(safe-area-inset-top)/4);
+    padding-top:calc(14px + env(safe-area-inset-top));
+    display:flex;align-items:center;gap:10px;
+    box-shadow:0 2px 10px rgba(21,63,40,0.25);
+  }
+  .brand{display:flex;align-items:center;gap:9px;flex:1;min-width:0;}
+  .brand-mark{width:30px;height:30px;flex:none;}
+  .brand-text{display:flex;flex-direction:column;line-height:1.05;min-width:0;}
+  .brand-text b{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .brand-text span{font-size:10.5px;letter-spacing:.04em;color:#CFE3D4;text-transform:uppercase;}
+  .icon-btn{
+    width:36px;height:36px;border-radius:10px;border:none;background:rgba(255,255,255,0.14);
+    color:#fff;display:flex;align-items:center;justify-content:center;flex:none;cursor:pointer;
+  }
+  .icon-btn:active{background:rgba(255,255,255,0.26);}
+  .icon-btn svg{width:19px;height:19px;}
+
+  /* ---- Content ---- */
+  .content{flex:1;padding:16px 16px 100px;}
+  .view-title{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;margin:2px 0 4px;}
+  .view-sub{font-size:13px;color:var(--graphite-soft);margin:0 0 18px;}
+
+  /* ---- Tabs ---- */
+  .tabs{display:flex;gap:6px;margin-bottom:16px;background:#EAE6D8;border-radius:12px;padding:4px;}
+  .tab{flex:1;text-align:center;padding:9px 4px;border-radius:9px;font-size:13.5px;font-weight:600;color:var(--graphite-soft);cursor:pointer;user-select:none;}
+  .tab.active{background:var(--paper-raised);color:var(--forest);box-shadow:var(--shadow);}
+
+  /* ---- Cards ---- */
+  .card{
+    background:var(--paper-raised);border-radius:var(--radius);box-shadow:var(--shadow);
+    margin-bottom:12px;overflow:hidden;position:relative;
+  }
+  .insp-card{display:flex;gap:12px;padding:14px 14px 14px 12px;cursor:pointer;align-items:center;border-left:5px solid var(--line);}
+  .insp-card.st-green{border-left-color:var(--moss);}
+  .insp-card.st-amber{border-left-color:var(--amber);}
+  .insp-card.st-red{border-left-color:var(--clay);}
+  .insp-card:active{background:#FBFAF6;}
+  .ring{width:52px;height:52px;flex:none;}
+  .insp-info{flex:1;min-width:0;}
+  .insp-unit{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15.5px;}
+  .insp-meta{font-size:12px;color:var(--graphite-soft);margin-top:2px;}
+  .insp-meta .mono{font-size:11.5px;}
+  .insp-flags{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;}
+  .chip{font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:20px;}
+  .chip-red{background:var(--clay-bg);color:var(--clay);}
+  .chip-amber{background:var(--amber-bg);color:var(--amber);}
+  .chip-green{background:var(--moss-bg);color:var(--moss);}
+  .chevron{flex:none;color:var(--line);}
+
+  .empty{text-align:center;padding:60px 20px;color:var(--graphite-soft);}
+  .empty svg{width:46px;height:46px;color:var(--line);margin-bottom:12px;}
+  .empty p{font-size:14px;margin:4px 0;}
+
+  /* ---- Buttons ---- */
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:7px;
+    border:none;border-radius:11px;font-family:'Inter',sans-serif;font-weight:600;font-size:14.5px;
+    padding:12px 18px;cursor:pointer;
+  }
+  .btn-primary{background:var(--forest);color:#fff;}
+  .btn-primary:active{background:var(--forest-dark);}
+  .btn-ghost{background:transparent;color:var(--forest);border:1.5px solid var(--line);}
+  .btn-ghost:active{background:#EFEDE2;}
+  .btn-danger{background:var(--clay-bg);color:var(--clay);}
+  .btn-sm{padding:7px 12px;font-size:13px;border-radius:9px;}
+  .btn-block{width:100%;}
+  .fab{
+    position:fixed;left:0;right:0;bottom:0;max-width:560px;margin:0 auto;
+    padding:12px 16px calc(14px + env(safe-area-inset-bottom));
+    background:linear-gradient(to top, var(--paper) 60%, rgba(245,243,236,0));
+    z-index:15;
+  }
+
+  /* ---- Forms ---- */
+  .section{background:var(--paper-raised);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:14px;overflow:hidden;}
+  .section-head{padding:13px 15px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;}
+  .section-head h3{font-family:'Space Grotesk',sans-serif;font-size:14.5px;font-weight:700;margin:0;color:var(--forest-dark);text-transform:uppercase;letter-spacing:.02em;}
+  .field{padding:13px 15px;border-bottom:1px solid var(--line);}
+  .field:last-child{border-bottom:none;}
+  label{display:block;font-size:12.5px;font-weight:600;color:var(--graphite-soft);margin-bottom:6px;}
+  input[type=text],input[type=date],input[type=datetime-local],textarea,select{
+    width:100%;border:1.5px solid var(--line);border-radius:9px;padding:10px 11px;font-size:14.5px;
+    font-family:'Inter',sans-serif;background:#FDFCF9;color:var(--graphite);
+  }
+  textarea{resize:vertical;min-height:64px;}
+  input:focus,textarea:focus,select:focus{outline:2px solid var(--forest);outline-offset:1px;border-color:var(--forest);}
+
+  .item{padding:13px 15px;border-bottom:1px solid var(--line);}
+  .item:last-child{border-bottom:none;}
+  .item-q{font-size:14px;line-height:1.4;margin-bottom:10px;font-weight:500;}
+  .seg{display:flex;gap:6px;margin-bottom:8px;}
+  .seg-btn{
+    flex:1;padding:9px 4px;border-radius:9px;border:1.5px solid var(--line);background:#FDFCF9;
+    font-size:13px;font-weight:600;color:var(--graphite-soft);cursor:pointer;text-align:center;
+  }
+  .seg-btn.on-green{background:var(--moss);border-color:var(--moss);color:#fff;}
+  .seg-btn.on-red{background:var(--clay);border-color:var(--clay);color:#fff;}
+  .seg-btn.on-gray{background:var(--graphite-soft);border-color:var(--graphite-soft);color:#fff;}
+  .item-flag{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--clay);margin:6px 0 8px;}
+  .item-flag svg{width:14px;height:14px;}
+  .obs-input{margin-top:6px;}
+  .obs-input input{font-size:13.5px;}
+  .item-actions-row{display:flex;gap:8px;margin-top:9px;flex-wrap:wrap;}
+  .thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;}
+  .thumb{position:relative;width:64px;height:64px;border-radius:8px;overflow:hidden;border:1px solid var(--line);}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  .thumb .rm{position:absolute;top:2px;right:2px;width:18px;height:18px;background:rgba(20,20,15,0.65);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;cursor:pointer;}
+  .photo-add{width:64px;height:64px;border-radius:8px;border:1.5px dashed var(--line);display:flex;align-items:center;justify-content:center;color:var(--graphite-soft);cursor:pointer;flex:none;}
+  .photo-add svg{width:20px;height:20px;}
+  .action-chip{background:var(--amber-bg);color:var(--amber);font-size:12px;font-weight:600;padding:6px 10px;border-radius:9px;margin-top:8px;display:flex;align-items:center;gap:6px;}
+
+  .quickform{background:#FBF8F0;border:1px dashed var(--amber);border-radius:10px;padding:10px;margin-top:9px;}
+  .quickform .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
+  .quickform label{margin-bottom:4px;}
+
+  .score-hero{display:flex;align-items:center;gap:16px;background:var(--paper-raised);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;margin-bottom:16px;}
+  .score-hero .ring{width:74px;height:74px;}
+  .score-hero .num{font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;}
+  .score-hero .lbl{font-size:12px;color:var(--graphite-soft);}
+
+  .action-item{display:flex;gap:10px;align-items:flex-start;padding:13px 14px;border-bottom:1px solid var(--line);}
+  .action-item:last-child{border-bottom:none;}
+  .cb{width:22px;height:22px;border-radius:6px;border:2px solid var(--line);flex:none;margin-top:1px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .cb.done{background:var(--moss);border-color:var(--moss);color:#fff;}
+  .action-item .body{flex:1;min-width:0;}
+  .action-item .title{font-size:14px;font-weight:600;}
+  .action-item.done .title{text-decoration:line-through;color:var(--graphite-soft);}
+  .action-item .meta{font-size:11.5px;color:var(--graphite-soft);margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;}
+  .prio{font-weight:700;padding:1px 7px;border-radius:20px;font-size:10.5px;}
+  .prio-Alta{background:var(--clay-bg);color:var(--clay);}
+  .prio-Média{background:var(--amber-bg);color:var(--amber);}
+  .prio-Baixa{background:#EAF0EA;color:var(--graphite-soft);}
+
+  .sticky-save{position:sticky;bottom:0;background:var(--paper-raised);border-top:1px solid var(--line);padding:12px 16px calc(12px + env(safe-area-inset-bottom));display:flex;gap:10px;z-index:10;}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(20,22,17,0.45);z-index:50;display:flex;align-items:flex-end;justify-content:center;}
+  .modal{background:var(--paper-raised);width:100%;max-width:560px;border-radius:18px 18px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom));max-height:85vh;overflow:auto;}
+  .modal h3{font-family:'Space Grotesk',sans-serif;margin:0 0 4px;}
+  .modal .close{float:right;}
+
+  .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--graphite);color:#fff;padding:10px 16px;border-radius:24px;font-size:13.5px;z-index:60;box-shadow:var(--shadow);}
+
+  .settings-row{display:flex;align-items:center;justify-content:space-between;padding:12px 15px;border-bottom:1px solid var(--line);}
+  .settings-row:last-child{border-bottom:none;}
+  .unit-tag{display:flex;align-items:center;gap:6px;background:var(--moss-bg);color:var(--forest-dark);padding:6px 10px;border-radius:20px;font-size:13px;font-weight:600;}
+  .unit-tag .x{cursor:pointer;opacity:.7;}
+
+  .loading-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:70vh;color:var(--graphite-soft);gap:10px;font-size:13.5px;}
+  .spinner{width:26px;height:26px;border:3px solid var(--line);border-top-color:var(--forest);border-radius:50%;animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  @media print{
+    .topbar,.fab,.tabs,.sticky-save,.icon-btn,.item-actions-row .btn,.photo-add{display:none !important;}
+    body{background:#fff;}
+    #app{max-width:100%;}
+    .card,.section{box-shadow:none;border:1px solid #ccc;break-inside:avoid;}
+  }
+</style>
+</head>
+<body>
+<div id="app"><div class="loading-wrap"><div class="spinner"></div><div>Carregando vistorias…</div></div></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================= DATA MODEL ============================= */
+
+const DEFAULT_TEMPLATE = [
+  { id:'org', title:'Organização e Armazenamento', items:[
+    { id:'q1', text:"A organização da unidade está em conformidade? (limpeza, armazenamento, organização)", positive:'Sim' },
+    { id:'q2', text:"Os resíduos estão acondicionados corretamente, com todos os subgrupos conforme as obrigações técnicas?", positive:'Sim' }
+  ]},
+  { id:'infra', title:'Infraestrutura e Procedimentos', items:[
+    { id:'q3', text:"A unidade está precisando de alguma alteração em infraestrutura civil para cumprimento de exigências ou adequação?", positive:'Não' },
+    { id:'q4', text:"Os procedimentos de recebimento, armazenamento, tratamento e destinação final estão dentro dos padrões adequados?", positive:'Sim' },
+    { id:'q5', text:"Foi identificado algum procedimento já definido que não está sendo cumprido?", positive:'Não' }
+  ]},
+  { id:'trat', title:'Tratamento (Autoclave / Trituração)', items:[
+    { id:'q6', text:"Os ciclos de tratamento e o controle dos recebimentos de resíduos estão funcionando normalmente e sendo registrados?", positive:'Sim', appliesTo:'tratamento' }
+  ]},
+  { id:'seg', title:'Segurança do Trabalho', items:[
+    { id:'q7', text:"Os funcionários presentes estavam utilizando EPIs adequadamente?", positive:'Sim' }
+  ]},
+  { id:'efl', title:'Efluentes e Infraestrutura Sanitária', items:[
+    { id:'q8', text:"As caixas de efluentes, caixa SAO, limpeza de caixa d'água, dedetização e limpeza do ar condicionado estão em conformidade?", positive:'Sim' },
+    { id:'q9', text:"A temperatura de saída da caixa de efluentes está abaixo de 40°C?", positive:'Sim', appliesTo:'tratamento' }
+  ]},
+  { id:'gestao', title:'Gestão da Base', items:[
+    { id:'q10', text:"Existe alguma solicitação feita pelo Responsável da Base? (compra/troca de equipamentos, insumos etc.)", positive:'Não' },
+    { id:'q11', text:"O Responsável pela base estava presente na visita?", positive:'Sim' }
+  ]}
+];
+
+const DEFAULT_UNITS = [
+  { name:'Bauru', type:'tratamento' },
+  { name:'Assis', type:'tratamento' },
+  { name:'São Manuel', type:'tratamento' },
+  { name:'Arealva', type:'tratamento' },
+  { name:'Bernardino de Campos', type:'transbordo' },
+  { name:'Anhumas', type:'transbordo' },
+  { name:'Itapeva', type:'transbordo' }
+];
+const UNIT_TYPE_LABEL = { tratamento:'Tratamento', transbordo:'Transbordo' };
+
+function getUnitType(name){
+  const u = S.settings.units.find(x => x.name === name);
+  return u ? u.type : 'tratamento';
+}
+
+function buildSectionsForUnit(unitType){
+  return DEFAULT_TEMPLATE
+    .map(sec => ({
+      ...sec,
+      items: sec.items
+        .filter(it => (it.appliesTo || 'all') === 'all' || it.appliesTo === unitType)
+        .map(it => ({...it, answer:null, obs:'', photos:[]}))
+    }))
+    .filter(sec => sec.items.length > 0);
+}
+
+function hasAnyAnswer(insp){
+  return insp.sections.some(s => s.items.some(it => it.answer != null));
+}
+
+const uid = (p) => p + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const nowLocalISO = () => {
+  const d = new Date(); const pad = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+const fmtDate = (iso) => { if(!iso) return '—'; const d=new Date(iso); if(isNaN(d)) return iso;
+  return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); };
+const fmtDateOnly = (iso) => { if(!iso) return '—'; const d=new Date(iso+'T00:00:00'); if(isNaN(d)) return iso; return d.toLocaleDateString('pt-BR'); };
+const addDays = (iso, n) => { const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
+
+function emptyInspection(unit, responsavel, unitType){
+  return {
+    id: uid('insp'),
+    unit: unit || '',
+    unitType: unitType || 'tratamento',
+    date: nowLocalISO(),
+    responsavelVistoria: responsavel || '',
+    responsavelBaseNome: '',
+    sections: buildSectionsForUnit(unitType || 'tratamento'),
+    analiseCritica: '',
+    fotosGerais: [],
+    acoes: [],
+    previousInspectionId: null,
+    carriedActions: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function computeScore(insp){
+  let total=0, conforme=0, flagged=0;
+  insp.sections.forEach(s => s.items.forEach(it => {
+    if(it.answer && it.answer !== 'N/A'){
+      total++;
+      if(it.answer === it.positive) conforme++; else flagged++;
+    }
+  }));
+  return { total, conforme, flagged, pct: total ? Math.round((conforme/total)*100) : 0 };
+}
+
+/* ============================= STORAGE LAYER ============================= */
+/* Two possible backends:
+   - 'cloud'  -> window.storage, available when this file is opened as a Claude artifact
+   - 'local'  -> IndexedDB in this browser, used when opened as a standalone/downloaded file
+   Detected once at startup; safeGet/safeSet/safeDelete route to whichever is active. */
+
+let STORAGE_BACKEND = null;
+let IDB = null;
+
+function idbOpen(){
+  return new Promise((resolve,reject)=>{
+    if(!('indexedDB' in window)){ reject(new Error('no indexedDB')); return; }
+    const req = indexedDB.open('cheiroverde_vistorias', 1);
+    req.onupgradeneeded = () => { req.result.createObjectStore('kv', { keyPath:'key' }); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+function idbGet(key){
+  return new Promise((resolve,reject)=>{
+    const tx = IDB.transaction('kv','readonly');
+    const rq = tx.objectStore('kv').get(key);
+    rq.onsuccess = () => resolve(rq.result ? rq.result.value : null);
+    rq.onerror = () => reject(rq.error);
+  });
+}
+function idbSet(key,value){
+  return new Promise((resolve,reject)=>{
+    const tx = IDB.transaction('kv','readwrite');
+    tx.objectStore('kv').put({key,value});
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+function idbDelete(key){
+  return new Promise((resolve,reject)=>{
+    const tx = IDB.transaction('kv','readwrite');
+    tx.objectStore('kv').delete(key);
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function detectStorageBackend(){
+  // Try the Claude artifact storage first, but verify it actually works (not just defined).
+  if(typeof window.storage !== 'undefined' && window.storage && typeof window.storage.set === 'function'){
+    try{
+      const ok = await window.storage.set('__probe__', '1');
+      if(ok){ STORAGE_BACKEND = 'cloud'; try{ await window.storage.delete('__probe__'); }catch(e){} return; }
+    }catch(e){ /* fall through to local */ }
+  }
+  try{ IDB = await idbOpen(); STORAGE_BACKEND = 'local'; }
+  catch(e){ STORAGE_BACKEND = 'none'; }
+}
+
+async function safeGet(key, shared){
+  try{
+    if(STORAGE_BACKEND==='cloud'){ const r = await window.storage.get(key, !!shared); return r ? r.value : null; }
+    if(STORAGE_BACKEND==='local'){ return await idbGet(key); }
+    return null;
+  }catch(e){ return null; }
+}
+async function safeSet(key, value, shared){
+  try{
+    if(STORAGE_BACKEND==='cloud'){ const r = await window.storage.set(key, value, !!shared); return !!r; }
+    if(STORAGE_BACKEND==='local'){ return await idbSet(key, value); }
+    return false;
+  }catch(e){ console.error('storage set failed', key, e); return false; }
+}
+async function safeDelete(key, shared){
+  try{
+    if(STORAGE_BACKEND==='cloud'){ await window.storage.delete(key, !!shared); }
+    else if(STORAGE_BACKEND==='local'){ await idbDelete(key); }
+  }catch(e){}
+}
+
+const KEY_SETTINGS = 'settings';
+const KEY_INDEX = 'inspections_index';
+const KEY_ACTIONS_INDEX = 'actions_index';
+const keyInsp = (id) => 'inspection:' + id;
+
+async function loadSettings(){
+  const raw = await safeGet(KEY_SETTINGS);
+  if(raw){
+    try{
+      const parsed = JSON.parse(raw);
+      // migrate older format where units was a plain array of strings
+      parsed.units = (parsed.units || []).map(u => typeof u === 'string' ? { name:u, type:'tratamento' } : u);
+      if(parsed.units.length === 0) parsed.units = DEFAULT_UNITS.slice();
+      return parsed;
+    }catch(e){}
+  }
+  return { units: DEFAULT_UNITS.slice(), defaultResponsavel:'' };
+}
+async function saveSettings(s){ await safeSet(KEY_SETTINGS, JSON.stringify(s)); }
+
+async function loadIndex(){
+  const raw = await safeGet(KEY_INDEX);
+  if(raw){ try{ return JSON.parse(raw); }catch(e){} }
+  return [];
+}
+async function saveIndex(idx){ await safeSet(KEY_INDEX, JSON.stringify(idx)); }
+
+async function loadActionsIndex(){
+  const raw = await safeGet(KEY_ACTIONS_INDEX);
+  if(raw){ try{ return JSON.parse(raw); }catch(e){} }
+  return [];
+}
+async function saveActionsIndex(a){ await safeSet(KEY_ACTIONS_INDEX, JSON.stringify(a)); }
+
+async function loadInspection(id){
+  const raw = await safeGet(keyInsp(id));
+  if(raw){ try{ return JSON.parse(raw); }catch(e){} }
+  return null;
+}
+
+async function persistInspection(insp, {silent}={}){
+  insp.updatedAt = new Date().toISOString();
+  const ok = await safeSet(keyInsp(insp.id), JSON.stringify(insp));
+  // update summary index
+  let idx = await loadIndex();
+  const score = computeScore(insp);
+  const summary = { id: insp.id, unit: insp.unit, unitType: insp.unitType || getUnitType(insp.unit), date: insp.date, responsavel: insp.responsavelVistoria,
+    pct: score.pct, flagged: score.flagged, total: score.total, updatedAt: insp.updatedAt };
+  const pos = idx.findIndex(x => x.id === insp.id);
+  if(pos>=0) idx[pos] = summary; else idx.unshift(summary);
+  await saveIndex(idx);
+  // sync open actions index
+  let ai = await loadActionsIndex();
+  ai = ai.filter(a => a.inspectionId !== insp.id);
+  insp.acoes.forEach(a => ai.push({
+    actionId:a.id, inspectionId:insp.id, unit:insp.unit, inspDate:insp.date,
+    title:a.title, responsavel:a.responsavel, prioridade:a.prioridade, prazo:a.prazo,
+    status:a.status, criadoEm:a.criadoEm
+  }));
+  await saveActionsIndex(ai);
+  if(ok){ if(!silent) toast('Vistoria salva'); }
+  else { toast('⚠️ Não foi possível salvar. Veja o aviso em Configurações.'); }
+  return ok;
+}
+
+async function deleteInspection(id){
+  await safeDelete(keyInsp(id));
+  let idx = await loadIndex(); idx = idx.filter(x => x.id !== id); await saveIndex(idx);
+  let ai = await loadActionsIndex(); ai = ai.filter(a => a.inspectionId !== id); await saveActionsIndex(ai);
+}
+
+/* ============================= IMAGE HANDLING ============================= */
+
+function fileToCompressedDataURL(file, maxDim=1100, quality=0.62){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('read fail'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('img fail'));
+      img.onload = () => {
+        let {width,height} = img;
+        if(width > maxDim || height > maxDim){
+          if(width>height){ height = Math.round(height*maxDim/width); width = maxDim; }
+          else{ width = Math.round(width*maxDim/height); height = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img,0,0,width,height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function estimateSizeMB(insp){
+  let chars = 0;
+  insp.fotosGerais.forEach(p => chars += p.length);
+  insp.sections.forEach(s => s.items.forEach(it => it.photos.forEach(p => chars += p.length)));
+  return (chars * 0.75 / (1024*1024)).toFixed(2);
+}
+
+/* ============================= PDF REPORT ============================= */
+
+function hexRGB(hex){ const n = parseInt(hex.replace('#',''),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+
+function generatePDFBlob(insp){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  const M = 42;
+  let y = M;
+
+  function ensureSpace(h){ if(y + h > H - M){ doc.addPage(); y = M; } }
+  function write(str, size, opts={}){
+    doc.setFontSize(size);
+    doc.setFont('helvetica', opts.bold ? 'bold' : 'normal');
+    doc.setTextColor(...hexRGB(opts.color || '#23281f'));
+    const lines = doc.splitTextToSize(String(str), W - 2*M - (opts.indent||0));
+    lines.forEach(line=>{
+      ensureSpace(size*1.5);
+      doc.text(line, M + (opts.indent||0), y);
+      y += size*1.4;
+    });
+  }
+  function addPhoto(dataURL){
+    ensureSpace(126);
+    try{ doc.addImage(dataURL,'JPEG', M, y, 170, 118); y += 128; }catch(e){}
+  }
+
+  doc.setFillColor(...hexRGB('#1E5B3A'));
+  doc.rect(0,0,W,58,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold'); doc.setFontSize(15);
+  doc.text('Cheiro Verde Ambiental', M, 28);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
+  doc.text('Relatório de Vistoria — Controle de Qualidade', M, 44);
+  y = 80;
+
+  const score = computeScore(insp);
+  write(insp.unit || 'Unidade não definida', 17, {bold:true});
+  if(insp.previousInspectionId) write('Vistoria de acompanhamento', 10, {bold:true, color:'#C98A2C'});
+  write(`Data da vistoria: ${fmtDate(insp.date)}`, 10);
+  write(`Responsável pela vistoria: ${insp.responsavelVistoria || '—'}`, 10);
+  write(`Responsável da base presente: ${insp.responsavelBaseNome || '—'}`, 10);
+  write(`Resultado: ${score.conforme}/${score.total} itens conformes (${score.pct}%) · ${score.flagged} sinalizado(s)`, 11, {bold:true});
+  y += 6;
+
+  if(insp.carriedActions && insp.carriedActions.length){
+    write('AÇÕES VERIFICADAS NESTA VISTORIA', 11.5, {bold:true, color:'#1E5B3A'});
+    insp.carriedActions.forEach(a=>{
+      const label = !a.reviewed ? 'Não verificado' : (a.status==='Concluído' ? 'Corrigido' : 'Ainda pendente');
+      write(`• ${a.title} — ${label}`, 9.5, {indent:8});
+    });
+    y += 6;
+  }
+
+  insp.sections.forEach(sec=>{
+    ensureSpace(20);
+    write(sec.title.toUpperCase(), 11.5, {bold:true, color:'#1E5B3A'});
+    sec.items.forEach(it=>{
+      const flagged = it.answer && it.answer!=='N/A' && it.answer!==it.positive;
+      write(it.text, 9.8, {indent:6});
+      write(`Resposta: ${it.answer || 'Não respondido'}`, 9.5, {indent:14, bold:true, color: it.answer==null?'#5B6055':(flagged?'#B23A2E':'#4C7A4E')});
+      if(it.obs) write(`Obs: ${it.obs}`, 9, {indent:14, color:'#5B6055'});
+      it.photos.forEach(p=>addPhoto(p));
+      y += 3;
+    });
+    y += 5;
+  });
+
+  if(insp.analiseCritica){
+    ensureSpace(20);
+    write('ANÁLISE CRÍTICA E CONCLUSÃO', 11.5, {bold:true, color:'#1E5B3A'});
+    write(insp.analiseCritica, 9.8);
+    y += 4;
+  }
+
+  if(insp.fotosGerais.length){
+    ensureSpace(20);
+    write('RELATÓRIO FOTOGRÁFICO', 11.5, {bold:true, color:'#1E5B3A'});
+    insp.fotosGerais.forEach(p=>addPhoto(p));
+    y += 4;
+  }
+
+  if(insp.acoes.length){
+    ensureSpace(20);
+    write('AÇÕES E PRAZOS', 11.5, {bold:true, color:'#1E5B3A'});
+    insp.acoes.forEach(a=>{
+      write(`[${a.status}] ${a.title} — prioridade ${a.prioridade} — prazo ${fmtDateOnly(a.prazo)} — ${a.responsavel||'—'}`, 9.3, {indent:6});
+    });
+  }
+
+  const hist = S.index.filter(i=>i.unit===insp.unit).sort((a,b)=> new Date(a.date)-new Date(b.date));
+  if(hist.length>1){
+    ensureSpace(20);
+    write('HISTÓRICO DA UNIDADE', 11.5, {bold:true, color:'#1E5B3A'});
+    hist.forEach(i=> write(`${fmtDate(i.date)} — ${i.pct}% conforme`, 9.3, {indent:6}));
+  }
+
+  return doc.output('blob');
+}
+
+async function exportPDF(insp){
+  if(!(window.jspdf && window.jspdf.jsPDF)){
+    toast('⚠️ Gerador de PDF indisponível — verifique a conexão e tente novamente.');
+    return;
+  }
+  toast('Gerando PDF…');
+  let blob;
+  try{ blob = generatePDFBlob(insp); }
+  catch(e){ console.error(e); toast('Não foi possível gerar o PDF.'); return; }
+
+  const safeUnit = (insp.unit||'unidade').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]+/g,'_');
+  const filename = `vistoria_${safeUnit}_${(insp.date||'').slice(0,10)}.pdf`;
+
+  // 1) Native share sheet (works in Safari/Chrome on the published link)
+  try{
+    const file = new File([blob], filename, {type:'application/pdf'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({ files:[file], title: filename, text: `Relatório de vistoria — ${insp.unit}` });
+      return;
+    }
+  }catch(e){
+    if(e && e.name==='AbortError') return; // user cancelled the share sheet — not an error
+  }
+
+  // 2) Direct download (works in normal browsers; blocked in sandboxed viewers)
+  let downloadTried = false;
+  try{
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 8000);
+    downloadTried = true;
+  }catch(e){}
+
+  // 3) In-app viewer fallback: always show the PDF so the user can act on it
+  //    even where downloads/share are blocked (e.g. inside the Claude app).
+  openPDFViewer(blob, filename, downloadTried);
+}
+
+/* ============================= BACKUP ============================= */
+
+async function exportBackup(){
+  toast('Preparando backup…');
+  const inspections = [];
+  for(const s of S.index){
+    const full = await loadInspection(s.id);
+    if(full) inspections.push(full);
+  }
+  const payload = {
+    app:'cheiroverde-vistorias', version:1,
+    exportedAt:new Date().toISOString(),
+    settings:S.settings,
+    inspections
+  };
+  const blob = new Blob([JSON.stringify(payload)], {type:'application/json'});
+  const d = new Date(); const pad=n=>String(n).padStart(2,'0');
+  const filename = `backup_vistorias_${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.json`;
+
+  try{
+    const file = new File([blob], filename, {type:'application/json'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({ files:[file], title: filename });
+      return;
+    }
+  }catch(e){ if(e && e.name==='AbortError') return; }
+
+  try{
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 8000);
+    toast(`Backup gerado: ${inspections.length} vistoria(s)`);
+  }catch(e){ toast('Não foi possível salvar o backup neste ambiente.'); }
+}
+
+async function importBackup(file){
+  let data;
+  try{ data = JSON.parse(await file.text()); }
+  catch(e){ toast('Arquivo inválido.'); return; }
+  if(!data || data.app!=='cheiroverde-vistorias' || !Array.isArray(data.inspections)){
+    toast('Este arquivo não é um backup do app de vistorias.'); return;
+  }
+  toast('Importando…');
+
+  // merge units (keep existing, add new ones from backup)
+  if(data.settings && Array.isArray(data.settings.units)){
+    data.settings.units.forEach(u=>{
+      const unit = typeof u==='string' ? {name:u,type:'tratamento'} : u;
+      if(!S.settings.units.some(x=>x.name===unit.name)) S.settings.units.push(unit);
+    });
+    if(!S.settings.defaultResponsavel && data.settings.defaultResponsavel){
+      S.settings.defaultResponsavel = data.settings.defaultResponsavel;
+    }
+    await saveSettings(S.settings);
+  }
+
+  let added=0, updated=0, failed=0;
+  for(const insp of data.inspections){
+    if(!insp || !insp.id) continue;
+    const existing = S.index.find(i=>i.id===insp.id);
+    if(existing && new Date(existing.updatedAt) >= new Date(insp.updatedAt)) continue; // local copy is newer or equal
+    const keepUpdated = insp.updatedAt;
+    const ok = await persistInspection(insp, {silent:true});
+    if(ok){
+      // preserve original timestamp so repeated imports stay idempotent
+      insp.updatedAt = keepUpdated || insp.updatedAt;
+      await safeSet(keyInsp(insp.id), JSON.stringify(insp));
+      existing ? updated++ : added++;
+    } else failed++;
+    S.index = await loadIndex();
+  }
+  S.index = await loadIndex();
+  S.actionsIndex = await loadActionsIndex();
+  toast(failed ? `⚠️ ${added} importada(s), ${failed} com erro` : `✅ ${added} nova(s), ${updated} atualizada(s)`);
+}
+
+function openPDFViewer(blob, filename, downloadTried){
+  const url = URL.createObjectURL(blob);
+  const bg = document.createElement('div');
+  bg.className='modal-bg'; bg.id='pdf-viewer-bg';
+  bg.style.alignItems='stretch';
+  bg.innerHTML = `
+    <div class="modal" style="border-radius:0;max-height:100vh;height:100%;display:flex;flex-direction:column;padding:12px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <b style="font-family:'Space Grotesk',sans-serif;font-size:14px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(filename)}</b>
+        <button class="btn btn-ghost btn-sm" id="pdf-close">Fechar</button>
+      </div>
+      <iframe src="${url}" style="flex:1;width:100%;border:1px solid var(--line);border-radius:10px;background:#fff;"></iframe>
+      <p style="font-size:12px;color:var(--graphite-soft);margin:10px 0 0;">
+        ${downloadTried
+          ? 'Se o download não apareceu, este ambiente bloqueia salvar arquivos. Abra o app pelo <b>link publicado no Safari ou Chrome</b> para compartilhar o PDF pelo WhatsApp/e-mail.'
+          : 'Este ambiente bloqueia salvar arquivos. Abra o app pelo <b>link publicado no Safari ou Chrome</b> para compartilhar o PDF pelo WhatsApp/e-mail.'}
+      </p>
+    </div>`;
+  document.body.appendChild(bg);
+  document.getElementById('pdf-close').addEventListener('click', ()=>{
+    bg.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  });
+}
+
+/* ============================= APP STATE ============================= */
+
+const S = {
+  view:'home',
+  tab:'vistorias', // vistorias | acoes
+  settings:null,
+  index:[],
+  actionsIndex:[],
+  current:null, // full inspection object being viewed/edited
+  editing:false,
+  filterUnit:'Todas',
+  saveTimer:null
+};
+
+async function boot(){
+  await detectStorageBackend();
+  S.settings = await loadSettings();
+  S.index = await loadIndex();
+  S.actionsIndex = await loadActionsIndex();
+  render();
+  if(STORAGE_BACKEND==='none'){
+    toast('⚠️ Este navegador não permite salvar dados. As vistorias serão perdidas ao fechar.');
+  }
+}
+
+function toast(msg){
+  const el = document.createElement('div');
+  el.className='toast'; el.textContent=msg;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 2200);
+}
+
+function navigate(view, params){
+  S.view = view;
+  if(params) Object.assign(S, params);
+  render();
+  window.scrollTo(0,0);
+}
+
+/* ============================= ICONS ============================= */
+
+const ICON = {
+  back:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  camera:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13.5" r="3.3"/></svg>',
+  settings:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>',
+  print:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>',
+  share:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>',
+  alert:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+  empty:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>',
+  leaf:'<svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="15" fill="#2E7D4F"/><path d="M10 22c0-7 5-12 12-12-1 8-6 12-12 12z" fill="#B7DBAE"/><path d="M10 22c2-4 5-7 9-9" stroke="#2E7D4F" stroke-width="1.2" stroke-linecap="round"/></svg>'
+};
+
+function ringSVG(pct, size=52, stroke=6){
+  const r = (size-stroke)/2, c = 2*Math.PI*r;
+  const color = pct>=80?'var(--moss)':pct>=50?'var(--amber)':'var(--clay)';
+  const off = c - (pct/100)*c;
+  return `<svg class="ring" viewBox="0 0 ${size} ${size}">
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="var(--line)" stroke-width="${stroke}"/>
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}"
+      stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${off}"
+      transform="rotate(-90 ${size/2} ${size/2})"/>
+    <text x="50%" y="53%" text-anchor="middle" dominant-baseline="middle" font-family="Space Grotesk" font-weight="700"
+      font-size="${size*0.30}" fill="var(--graphite)">${pct}%</text>
+  </svg>`;
+}
+
+/* ============================= RENDER: SHELL ============================= */
+
+function render(){
+  const app = document.getElementById('app');
+  let title = 'Vistorias';
+  if(S.view==='form') title = S.editing ? 'Vistoria' : 'Nova vistoria';
+  if(S.view==='detail') title = 'Relatório';
+  if(S.view==='settings') title = 'Configurações';
+
+  app.innerHTML = `
+    <div class="topbar">
+      ${S.view!=='home' ? `<button class="icon-btn" id="btn-back">${ICON.back}</button>` : `<div class="brand-mark">${ICON.leaf}</div>`}
+      <div class="brand-text" style="flex:1">
+        <b>${title}</b>
+        ${S.view==='home' ? '<span>Cheiro Verde Ambiental</span>' : ''}
+      </div>
+      ${S.view==='home' ? `<button class="icon-btn" id="btn-settings">${ICON.settings}</button>` : ''}
+      ${S.view==='detail' ? `<button class="icon-btn" id="btn-print">${ICON.share}</button>` : ''}
+    </div>
+    <div class="content" id="content"></div>
+  `;
+  const back = document.getElementById('btn-back');
+  if(back) back.addEventListener('click', onBack);
+  const settingsBtn = document.getElementById('btn-settings');
+  if(settingsBtn) settingsBtn.addEventListener('click', ()=>navigate('settings'));
+  const printBtn = document.getElementById('btn-print');
+  if(printBtn) printBtn.addEventListener('click', ()=>exportPDF(S.current));
+
+  const c = document.getElementById('content');
+  if(S.view==='home') renderHome(c);
+  else if(S.view==='form') renderForm(c);
+  else if(S.view==='detail') renderDetail(c);
+  else if(S.view==='settings') renderSettings(c);
+}
+
+function onBack(){
+  if(S.view==='form'){
+    navigate('home');
+  } else if(S.view==='detail'){
+    navigate('home');
+  } else {
+    navigate('home');
+  }
+}
+
+/* ============================= RENDER: HOME ============================= */
+
+function renderHome(c){
+  const filtered = S.filterUnit==='Todas' ? S.index : S.index.filter(i=>i.unit===S.filterUnit);
+  const sorted = [...filtered].sort((a,b)=> new Date(b.date) - new Date(a.date));
+  const tratamentoUnits = S.settings.units.filter(u=>u.type==='tratamento');
+  const transbordoUnits = S.settings.units.filter(u=>u.type==='transbordo');
+
+  let html = `
+    <div class="tabs">
+      <div class="tab ${S.tab==='vistorias'?'active':''}" data-tab="vistorias">Vistorias</div>
+      <div class="tab ${S.tab==='acoes'?'active':''}" data-tab="acoes">Ações em aberto</div>
+    </div>
+  `;
+
+  if(S.tab==='vistorias'){
+    html += `<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:6px;">
+      <div class="btn btn-sm ${S.filterUnit==='Todas'?'btn-primary':'btn-ghost'}" data-unit-filter="Todas" style="white-space:nowrap;flex:none;">Todas</div>
+      ${tratamentoUnits.map(u=>`<div class="btn btn-sm ${S.filterUnit===u.name?'btn-primary':'btn-ghost'}" data-unit-filter="${escapeAttr(u.name)}" style="white-space:nowrap;flex:none;">${escapeHTML(u.name)}</div>`).join('')}
+    </div>`;
+    if(transbordoUnits.length){
+      html += `<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;">
+        ${transbordoUnits.map(u=>`<div class="btn btn-sm ${S.filterUnit===u.name?'btn-primary':'btn-ghost'}" data-unit-filter="${escapeAttr(u.name)}" style="white-space:nowrap;flex:none;">${escapeHTML(u.name)}</div>`).join('')}
+      </div>`;
+    }
+
+    if(sorted.length===0){
+      html += `<div class="empty">${ICON.empty}<p><b>Nenhuma vistoria ainda</b></p><p>Toque em "Nova vistoria" para começar a auditoria de uma unidade.</p></div>`;
+    } else {
+      sorted.forEach(i=>{
+        const st = i.flagged===0 ? 'st-green' : (i.flagged<=2 ? 'st-amber':'st-red');
+        const typeLabel = UNIT_TYPE_LABEL[i.unitType || getUnitType(i.unit)] || 'Tratamento';
+        html += `
+        <div class="card insp-card ${st}" data-open="${i.id}">
+          ${ringSVG(i.pct)}
+          <div class="insp-info">
+            <div class="insp-unit">${escapeHTML(i.unit || 'Unidade não definida')}</div>
+            <div class="insp-meta mono">${fmtDate(i.date)} · ${typeLabel}</div>
+            <div class="insp-flags">
+              ${i.flagged>0?`<span class="chip chip-red">${i.flagged} não conforme</span>`:`<span class="chip chip-green">Tudo conforme</span>`}
+              ${i.responsavel?`<span class="chip chip-amber">${escapeHTML(i.responsavel)}</span>`:''}
+            </div>
+          </div>
+          <div class="chevron"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+        </div>`;
+      });
+    }
+    c.innerHTML = html;
+    c.querySelectorAll('[data-unit-filter]').forEach(el=>el.addEventListener('click', ()=>{S.filterUnit=el.dataset.unitFilter; render();}));
+    c.querySelectorAll('[data-open]').forEach(el=>el.addEventListener('click', async ()=>{
+      const insp = await loadInspection(el.dataset.open);
+      if(insp) navigate('detail', {current:insp, editing:false});
+    }));
+  } else {
+    const open = S.actionsIndex.filter(a=>a.status!=='Concluído').sort((a,b)=> new Date(a.prazo||'2999-01-01') - new Date(b.prazo||'2999-01-01'));
+    if(open.length===0){
+      html += `<div class="empty">${ICON.empty}<p><b>Nenhuma ação pendente</b></p><p>Itens não conformes gerados nas vistorias aparecem aqui.</p></div>`;
+    } else {
+      html += `<div class="section">`;
+      open.forEach(a=>{
+        const overdue = a.prazo && a.prazo < new Date().toISOString().slice(0,10);
+        html += `
+        <div class="action-item">
+          <div class="cb" data-toggle-action="${a.actionId}" data-insp="${a.inspectionId}">
+          </div>
+          <div class="body">
+            <div class="title">${escapeHTML(a.title)}</div>
+            <div class="meta">
+              <span class="mono">${escapeHTML(a.unit)}</span>
+              <span class="prio prio-${a.prioridade}">${a.prioridade}</span>
+              <span style="color:${overdue?'var(--clay)':'var(--graphite-soft)'}">Prazo: ${fmtDateOnly(a.prazo)}</span>
+              <span>${escapeHTML(a.responsavel||'')}</span>
+            </div>
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+    c.innerHTML = html;
+    c.querySelectorAll('[data-toggle-action]').forEach(el=>el.addEventListener('click', async ()=>{
+      await toggleAction(el.dataset.insp, el.dataset.toggleAction);
+    }));
+  }
+  c.querySelectorAll('[data-tab]').forEach(el=>el.addEventListener('click', ()=>{S.tab=el.dataset.tab; render();}));
+
+  // FAB
+  document.querySelectorAll('#app > .fab').forEach(el=>el.remove());
+  const fab = document.createElement('div');
+  fab.className='fab';
+  fab.innerHTML = `<button class="btn btn-primary btn-block" id="btn-new">${ICON.plus} Nova vistoria</button>`;
+  document.getElementById('app').appendChild(fab);
+  document.getElementById('btn-new').addEventListener('click', openNewInspectionModal);
+}
+
+async function toggleAction(inspId, actionId){
+  const insp = await loadInspection(inspId);
+  if(!insp) return;
+  const a = insp.acoes.find(x=>x.id===actionId);
+  if(!a) return;
+  a.status = a.status==='Concluído' ? 'Aberto' : 'Concluído';
+  await persistInspection(insp, {silent:true});
+  S.actionsIndex = await loadActionsIndex();
+  render();
+}
+
+function findLastInspectionForUnit(unitName){
+  const list = S.index.filter(i=>i.unit===unitName).sort((a,b)=> new Date(b.date)-new Date(a.date));
+  return list[0] || null;
+}
+
+function openNewInspectionModal(){
+  if(S.settings.units.length===0){
+    navigate('settings');
+    toast('Cadastre ao menos uma unidade primeiro');
+    return;
+  }
+  const optHTML = `
+    <optgroup label="Tratamento">
+      ${S.settings.units.filter(u=>u.type==='tratamento').map(u=>`<option value="${escapeAttr(u.name)}">${escapeHTML(u.name)}</option>`).join('')}
+    </optgroup>
+    <optgroup label="Transbordo">
+      ${S.settings.units.filter(u=>u.type==='transbordo').map(u=>`<option value="${escapeAttr(u.name)}">${escapeHTML(u.name)}</option>`).join('')}
+    </optgroup>`;
+  openModal(`
+    <h3>Nova vistoria</h3>
+    <p style="color:var(--graphite-soft);font-size:13.5px;margin:4px 0 12px;">Qual unidade você vai vistoriar?</p>
+    <select id="ni-unit" style="width:100%;">${optHTML}</select>
+    <div id="ni-prev-info" style="margin-top:12px;"></div>
+    <button class="btn btn-primary btn-block" id="ni-continue" style="margin-top:14px;">Continuar</button>
+  `);
+  const unitSel = document.getElementById('ni-unit');
+  const infoBox = document.getElementById('ni-prev-info');
+  function refreshInfo(){
+    const prev = findLastInspectionForUnit(unitSel.value);
+    const openCount = S.actionsIndex.filter(a=>a.unit===unitSel.value && a.status!=='Concluído').length;
+    if(prev){
+      infoBox.innerHTML = `
+        <div style="background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;">
+          <div style="font-size:12px;color:var(--graphite-soft);">Última vistoria nesta unidade</div>
+          <div style="font-weight:700;font-size:14px;margin-top:2px;">${fmtDate(prev.date)} · ${prev.pct}% conforme</div>
+          <div style="font-size:12px;color:var(--graphite-soft);margin-top:2px;">${prev.flagged} sinalizado(s) · ${openCount} ação(ões) em aberto</div>
+        </div>`;
+    } else {
+      infoBox.innerHTML = `<div style="font-size:12px;color:var(--graphite-soft);">Nenhuma vistoria anterior nesta unidade — será uma vistoria nova.</div>`;
+    }
+  }
+  unitSel.addEventListener('change', refreshInfo);
+  refreshInfo();
+  document.getElementById('ni-continue').addEventListener('click', ()=>{
+    const unitName = unitSel.value;
+    const unitType = getUnitType(unitName);
+    const prev = findLastInspectionForUnit(unitName);
+    closeModal();
+    if(prev) openFollowUpChoiceModal(unitName, unitType, prev);
+    else {
+      const insp = emptyInspection(unitName, S.settings.defaultResponsavel, unitType);
+      navigate('form', {current:insp, editing:false});
+    }
+  });
+}
+
+function openFollowUpChoiceModal(unitName, unitType, prevSummary){
+  openModal(`
+    <h3>${escapeHTML(unitName)}</h3>
+    <p style="color:var(--graphite-soft);font-size:13.5px;">Última vistoria em ${fmtDate(prevSummary.date)} · ${prevSummary.pct}% conforme.</p>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px;">
+      <button class="btn btn-primary btn-block" id="ni-followup">Vistoria de acompanhamento</button>
+      <button class="btn btn-ghost btn-block" id="ni-fresh">Vistoria nova (do zero)</button>
+    </div>
+    <p style="font-size:11.5px;color:var(--graphite-soft);margin-top:10px;">A vistoria de acompanhamento mostra o que foi sinalizado na visita anterior item a item e traz as ações em aberto para você confirmar se foram corrigidas.</p>
+  `);
+  document.getElementById('ni-followup').addEventListener('click', async ()=>{
+    closeModal();
+    const prevFull = await loadInspection(prevSummary.id);
+    const insp = buildFollowUpInspection(unitName, unitType, prevFull);
+    navigate('form', {current:insp, editing:false});
+  });
+  document.getElementById('ni-fresh').addEventListener('click', ()=>{
+    closeModal();
+    const insp = emptyInspection(unitName, S.settings.defaultResponsavel, unitType);
+    navigate('form', {current:insp, editing:false});
+  });
+}
+
+function buildFollowUpInspection(unitName, unitType, prevFull){
+  const insp = emptyInspection(unitName, S.settings.defaultResponsavel, unitType);
+  insp.previousInspectionId = prevFull ? prevFull.id : null;
+  if(prevFull){
+    insp.sections.forEach(sec=>{
+      const prevSec = prevFull.sections.find(s=>s.id===sec.id);
+      if(!prevSec) return;
+      sec.items.forEach(it=>{
+        const prevIt = prevSec.items.find(x=>x.id===it.id);
+        if(prevIt && prevIt.answer){
+          it.previousAnswer = prevIt.answer;
+          it.previousObs = prevIt.obs || '';
+          it.previousDate = prevFull.date;
+        }
+      });
+    });
+  }
+  insp.carriedActions = S.actionsIndex
+    .filter(a=>a.unit===unitName && a.status!=='Concluído')
+    .map(a=>({...a, reviewed:false}));
+  return insp;
+}
+
+async function reviewCarriedAction(insp, action, newStatus, c){
+  action.status = newStatus;
+  action.reviewed = true;
+  action.reviewedAt = new Date().toISOString();
+  const orig = await loadInspection(action.inspectionId);
+  if(orig){
+    const origAction = orig.acoes.find(x=>x.id===action.actionId);
+    if(origAction){
+      origAction.status = newStatus;
+      origAction.checkIns = origAction.checkIns || [];
+      origAction.checkIns.push({ date:new Date().toISOString(), status:newStatus, verifiedInInspectionId: insp.id, verifiedUnit: insp.unit, verifiedDate: insp.date });
+      await persistInspection(orig, {silent:true});
+    }
+  }
+  S.actionsIndex = await loadActionsIndex();
+  scheduleAutosave();
+  renderForm(c);
+}
+
+function unitHistoryHTML(unitName, excludeId){
+  const list = S.index.filter(i=>i.unit===unitName).sort((a,b)=> new Date(a.date)-new Date(b.date));
+  if(list.length<2) return '';
+  let rows = '';
+  list.forEach((i,idx)=>{
+    const prev = list[idx-1];
+    let delta = '<span style="color:var(--graphite-soft);font-size:11.5px;">—</span>';
+    if(prev){
+      const diff = i.pct - prev.pct;
+      delta = diff>0 ? `<span style="color:var(--moss);font-weight:700;font-size:12px;">▲ +${diff}%</span>`
+        : diff<0 ? `<span style="color:var(--clay);font-weight:700;font-size:12px;">▼ ${diff}%</span>`
+        : `<span style="color:var(--graphite-soft);font-size:12px;">= 0%</span>`;
+    }
+    const isCurrent = i.id===excludeId;
+    rows += `<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);${isCurrent?'font-weight:700;':''}">
+      <span class="mono" style="font-size:12px;">${fmtDate(i.date)}${isCurrent?' · esta vistoria':''}</span>
+      <span style="font-size:13px;">${i.pct}%</span>
+      ${delta}
+    </div>`;
+  });
+  return `<div class="section"><div class="section-head"><h3>Histórico da unidade</h3></div><div class="field">${rows}</div></div>`;
+}
+
+/* ============================= RENDER: FORM ============================= */
+
+function renderForm(c){
+  const insp = S.current;
+  const score = computeScore(insp);
+  let html = '';
+
+  if(insp.previousInspectionId){
+    html += `<div class="section" style="border-left:4px solid var(--amber);">
+      <div class="field" style="display:flex;align-items:center;gap:9px;">
+        <div style="color:var(--amber);">${ICON.alert}</div>
+        <div style="font-size:13px;"><b>Vistoria de acompanhamento</b> — comparando com a visita anterior nesta unidade.</div>
+      </div>
+    </div>`;
+  }
+
+  if(insp.carriedActions && insp.carriedActions.length){
+    html += `<div class="section">
+      <div class="section-head"><h3>Ações da vistoria anterior</h3></div>`;
+    insp.carriedActions.forEach((a,ai)=>{
+      html += `<div class="item">
+        <div class="item-q" style="margin-bottom:6px;">${escapeHTML(a.title)}</div>
+        <div class="meta" style="display:flex;gap:8px;flex-wrap:wrap;font-size:11.5px;color:var(--graphite-soft);margin-bottom:9px;">
+          <span class="prio prio-${a.prioridade}">${a.prioridade}</span>
+          <span>Prazo original: ${fmtDateOnly(a.prazo)}</span>
+          <span class="mono">${fmtDate(a.inspDate)}</span>
+        </div>
+        <div class="seg">
+          <button type="button" class="seg-btn ${a.reviewed && a.status==='Concluído'?'on-green':''}" data-carried-review="${ai}" data-carried-status="Concluído">✅ Corrigido</button>
+          <button type="button" class="seg-btn ${a.reviewed && a.status==='Aberto'?'on-red':''}" data-carried-review="${ai}" data-carried-status="Aberto">❌ Ainda pendente</button>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  html += `<div class="section">
+    <div class="section-head"><h3>Identificação</h3></div>
+    <div class="field">
+      <label>Unidade</label>
+      <select id="f-unit">
+        <optgroup label="Tratamento">
+          ${S.settings.units.filter(u=>u.type==='tratamento').map(u=>`<option value="${escapeAttr(u.name)}" ${u.name===insp.unit?'selected':''}>${escapeHTML(u.name)}</option>`).join('')}
+        </optgroup>
+        <optgroup label="Transbordo">
+          ${S.settings.units.filter(u=>u.type==='transbordo').map(u=>`<option value="${escapeAttr(u.name)}" ${u.name===insp.unit?'selected':''}>${escapeHTML(u.name)}</option>`).join('')}
+        </optgroup>
+      </select>
+      <div class="mono" style="font-size:11px;color:var(--graphite-soft);margin-top:5px;">Checklist ajustado automaticamente para unidades de transbordo (sem etapa de tratamento).</div>
+    </div>
+    <div class="field">
+      <label>Data e hora da vistoria</label>
+      <input type="datetime-local" id="f-date" value="${insp.date}">
+    </div>
+    <div class="field">
+      <label>Responsável pela vistoria</label>
+      <input type="text" id="f-resp" placeholder="Nome do vistoriador" value="${escapeAttr(insp.responsavelVistoria)}">
+    </div>
+    <div class="field">
+      <label>Responsável da base presente</label>
+      <input type="text" id="f-respbase" placeholder="Nome (deixe em branco se ninguém acompanhou)" value="${escapeAttr(insp.responsavelBaseNome)}">
+    </div>
+  </div>`;
+
+  insp.sections.forEach((sec, si)=>{
+    html += `<div class="section" data-section-id="${sec.id}">
+      <div class="section-head"><h3>${escapeHTML(sec.title)}</h3></div>`;
+    sec.items.forEach((it, ii)=>{
+      const flagged = it.answer && it.answer!=='N/A' && it.answer!==it.positive;
+      html += `<div class="item" data-si="${si}" data-ii="${ii}">
+        <div class="item-q">${escapeHTML(it.text)}</div>
+        ${it.previousAnswer?`<div class="mono" style="font-size:11px;color:${it.previousAnswer===it.positive?'var(--moss)':'var(--clay)'};margin-bottom:8px;">Última vistoria (${fmtDateOnly(it.previousDate?it.previousDate.slice(0,10):null)}): ${it.previousAnswer}${it.previousObs?' — '+escapeHTML(it.previousObs):''}</div>`:''}
+        <div class="seg" data-answer-si="${si}" data-answer-ii="${ii}">
+          ${['Sim','Não','N/A'].map(v=>{
+            let cls='';
+            if(it.answer===v){ cls = v==='N/A' ? 'on-gray' : (v===it.positive ? 'on-green' : 'on-red'); }
+            return `<button type="button" class="seg-btn ${cls}" data-val="${v}">${v}</button>`;
+
+          }).join('')}
+        </div>
+        ${flagged?`<div class="item-flag">${ICON.alert} Item sinalizado — não conforme</div>`:''}
+        <div class="obs-input">
+          <input type="text" placeholder="Observação (opcional)" data-obs-si="${si}" data-obs-ii="${ii}" value="${escapeAttr(it.obs)}">
+        </div>
+        <div class="thumbs" data-thumbs-si="${si}" data-thumbs-ii="${ii}">
+          ${it.photos.map((p,pi)=>`<div class="thumb"><img src="${p}"><div class="rm" data-rmphoto-si="${si}" data-rmphoto-ii="${ii}" data-pi="${pi}">✕</div></div>`).join('')}
+          <label class="photo-add">${ICON.camera}<input type="file" accept="image/*" capture="environment" multiple style="display:none" data-addphoto-si="${si}" data-addphoto-ii="${ii}"></label>
+        </div>
+        <div class="item-actions-row">
+          <button type="button" class="btn btn-sm btn-ghost" data-quickaction-si="${si}" data-quickaction-ii="${ii}">+ Ação / prazo</button>
+        </div>
+        <div class="qf-slot" data-qfslot-si="${si}" data-qfslot-ii="${ii}"></div>
+        <div class="linked-actions" data-linked-si="${si}" data-linked-ii="${ii}">
+          ${insp.acoes.filter(a=>a.origemItemId===it.id).map(a=>`<div class="action-chip">✓ ${escapeHTML(a.title)} · vence ${fmtDateOnly(a.prazo)}</div>`).join('')}
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+
+  html += `<div class="section">
+    <div class="section-head"><h3>Análise crítica e conclusão</h3></div>
+    <div class="field">
+      <textarea id="f-analise" placeholder="Resumo da vistoria, recomendações e prazos combinados...">${escapeHTML(insp.analiseCritica)}</textarea>
+    </div>
+  </div>`;
+
+  html += `<div class="section">
+    <div class="section-head"><h3>Relatório fotográfico geral</h3><span class="mono" style="font-size:11px;color:var(--graphite-soft)">${estimateSizeMB(insp)} MB</span></div>
+    <div class="field">
+      <div class="thumbs">
+        ${insp.fotosGerais.map((p,pi)=>`<div class="thumb"><img src="${p}"><div class="rm" data-rmgeral="${pi}">✕</div></div>`).join('')}
+        <label class="photo-add">${ICON.camera}<input type="file" accept="image/*" capture="environment" multiple style="display:none" id="f-addgeral"></label>
+      </div>
+    </div>
+  </div>`;
+
+  html += `<div class="score-hero">
+    ${ringSVG(score.pct,74,8)}
+    <div>
+      <div class="num">${score.conforme}/${score.total}</div>
+      <div class="lbl">itens conformes · ${score.flagged} sinalizado${score.flagged===1?'':'s'}</div>
+    </div>
+  </div>`;
+
+  c.innerHTML = html;
+  attachFormListeners(c);
+
+  // sticky save bar
+  document.querySelectorAll('#app > .sticky-save').forEach(el=>el.remove());
+  const bar = document.createElement('div');
+  bar.className='sticky-save';
+  bar.innerHTML = `
+    ${S.editing?`<button class="btn btn-danger" id="btn-del">${ICON.trash}</button>`:''}
+    <button class="btn btn-primary btn-block" id="btn-save">Salvar vistoria</button>
+  `;
+  document.getElementById('app').appendChild(bar);
+  document.getElementById('btn-save').addEventListener('click', async ()=>{
+    await persistInspection(S.current);
+    S.index = await loadIndex();
+    S.actionsIndex = await loadActionsIndex();
+    navigate('detail', {current:S.current, editing:false});
+  });
+  const delBtn = document.getElementById('btn-del');
+  if(delBtn) delBtn.addEventListener('click', confirmDeleteCurrent);
+}
+
+function scheduleAutosave(){
+  clearTimeout(S.saveTimer);
+  S.saveTimer = setTimeout(()=>{ persistInspection(S.current, {silent:true}); }, 900);
+}
+
+function attachFormListeners(c){
+  const insp = S.current;
+
+  c.querySelectorAll('[data-carried-review]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const action = insp.carriedActions[+btn.dataset.carriedReview];
+      reviewCarriedAction(insp, action, btn.dataset.carriedStatus, c);
+    });
+  });
+
+  const unitEl = document.getElementById('f-unit');
+  if(unitEl) unitEl.addEventListener('change', e=>{
+    insp.unit = e.target.value;
+    const newType = getUnitType(insp.unit);
+    if(!hasAnyAnswer(insp) && newType !== insp.unitType){
+      insp.unitType = newType;
+      insp.sections = buildSectionsForUnit(newType);
+    } else {
+      insp.unitType = newType;
+    }
+    scheduleAutosave();
+    renderForm(c);
+  });
+  const dateEl = document.getElementById('f-date');
+  if(dateEl) dateEl.addEventListener('change', e=>{ insp.date=e.target.value; scheduleAutosave(); });
+  const respEl = document.getElementById('f-resp');
+  if(respEl) respEl.addEventListener('input', e=>{ insp.responsavelVistoria=e.target.value; scheduleAutosave(); });
+  const respBaseEl = document.getElementById('f-respbase');
+  if(respBaseEl) respBaseEl.addEventListener('input', e=>{ insp.responsavelBaseNome=e.target.value; scheduleAutosave(); });
+  const analiseEl = document.getElementById('f-analise');
+  if(analiseEl) analiseEl.addEventListener('input', e=>{ insp.analiseCritica=e.target.value; scheduleAutosave(); });
+
+  c.querySelectorAll('[data-answer-si]').forEach(seg=>{
+    seg.querySelectorAll('.seg-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const si = +seg.dataset.answerSi, ii = +seg.dataset.answerIi;
+        const it = insp.sections[si].items[ii];
+        it.answer = (it.answer===btn.dataset.val) ? null : btn.dataset.val;
+        scheduleAutosave();
+        renderForm(c);
+      });
+    });
+  });
+
+  c.querySelectorAll('[data-obs-si]').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      insp.sections[+inp.dataset.obsSi].items[+inp.dataset.obsIi].obs = inp.value;
+      scheduleAutosave();
+    });
+  });
+
+  c.querySelectorAll('[data-addphoto-si]').forEach(inp=>{
+    inp.addEventListener('change', async ()=>{
+      const si=+inp.dataset.addphotoSi, ii=+inp.dataset.addphotoIi;
+      for(const file of inp.files){
+        try{ const d = await fileToCompressedDataURL(file); insp.sections[si].items[ii].photos.push(d); }
+        catch(e){ toast('Não foi possível anexar a foto'); }
+      }
+      scheduleAutosave();
+      renderForm(c);
+    });
+  });
+  c.querySelectorAll('[data-rmphoto-si]').forEach(x=>{
+    x.addEventListener('click', ()=>{
+      insp.sections[+x.dataset.rmphotoSi].items[+x.dataset.rmphotoIi].photos.splice(+x.dataset.pi,1);
+      scheduleAutosave(); renderForm(c);
+    });
+  });
+
+  const addGeral = document.getElementById('f-addgeral');
+  if(addGeral) addGeral.addEventListener('change', async ()=>{
+    for(const file of addGeral.files){
+      try{ const d = await fileToCompressedDataURL(file); insp.fotosGerais.push(d); }
+      catch(e){ toast('Não foi possível anexar a foto'); }
+    }
+    scheduleAutosave(); renderForm(c);
+  });
+  c.querySelectorAll('[data-rmgeral]').forEach(x=>{
+    x.addEventListener('click', ()=>{ insp.fotosGerais.splice(+x.dataset.rmgeral,1); scheduleAutosave(); renderForm(c); });
+  });
+
+  c.querySelectorAll('[data-quickaction-si]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const si=+btn.dataset.quickactionSi, ii=+btn.dataset.quickactionIi;
+      const slot = c.querySelector(`[data-qfslot-si="${si}"][data-qfslot-ii="${ii}"]`);
+      if(slot.innerHTML){ slot.innerHTML=''; return; }
+      const it = insp.sections[si].items[ii];
+      slot.innerHTML = `
+        <div class="quickform">
+          <label>Ação corretiva</label>
+          <input type="text" data-qf-title value="${escapeAttr(it.text.slice(0,80))}">
+          <div class="row2">
+            <div><label>Responsável</label><input type="text" data-qf-resp value="${escapeAttr(insp.responsavelVistoria||S.settings.defaultResponsavel||'')}"></div>
+            <div><label>Prioridade</label><select data-qf-prio><option>Baixa</option><option>Média</option><option>Alta</option></select></div>
+          </div>
+          <div class="row2">
+            <div><label>Prazo</label><input type="date" data-qf-prazo value="${addDays(null,7)}"></div>
+            <div style="display:flex;align-items:flex-end;"><button type="button" class="btn btn-primary btn-sm btn-block" data-qf-add>Adicionar</button></div>
+          </div>
+        </div>`;
+      slot.querySelector('[data-qf-add]').addEventListener('click', ()=>{
+        const title = slot.querySelector('[data-qf-title]').value.trim();
+        if(!title){ toast('Descreva a ação'); return; }
+        insp.acoes.push({
+          id: uid('acao'), title,
+          responsavel: slot.querySelector('[data-qf-resp]').value.trim(),
+          prioridade: slot.querySelector('[data-qf-prio]').value,
+          prazo: slot.querySelector('[data-qf-prazo]').value,
+          status:'Aberto', origemItemId: it.id, criadoEm: new Date().toISOString()
+        });
+        scheduleAutosave();
+        renderForm(c);
+      });
+    });
+  });
+}
+
+async function confirmDeleteCurrent(){
+  openModal(`
+    <h3>Excluir vistoria?</h3>
+    <p style="color:var(--graphite-soft);font-size:14px;">Esta ação não pode ser desfeita. Todas as fotos e observações desta vistoria serão removidas.</p>
+    <div style="display:flex;gap:10px;margin-top:14px;">
+      <button class="btn btn-ghost btn-block" id="m-cancel">Cancelar</button>
+      <button class="btn btn-danger btn-block" id="m-confirm">Excluir</button>
+    </div>
+  `);
+  document.getElementById('m-cancel').addEventListener('click', closeModal);
+  document.getElementById('m-confirm').addEventListener('click', async ()=>{
+    await deleteInspection(S.current.id);
+    S.index = await loadIndex();
+    S.actionsIndex = await loadActionsIndex();
+    closeModal();
+    navigate('home');
+    toast('Vistoria excluída');
+  });
+}
+
+/* ============================= RENDER: DETAIL ============================= */
+
+function renderDetail(c){
+  const insp = S.current;
+  const score = computeScore(insp);
+  let html = `
+    <div class="score-hero">
+      ${ringSVG(score.pct,74,8)}
+      <div>
+        <div class="num">${escapeHTML(insp.unit)}</div>
+        <div class="lbl mono">${fmtDate(insp.date)}</div>
+        <div class="lbl">${score.conforme}/${score.total} conformes · ${score.flagged} sinalizado${score.flagged===1?'':'s'}</div>
+        ${insp.previousInspectionId?'<div class="lbl" style="color:var(--amber);font-weight:600;">Vistoria de acompanhamento</div>':''}
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-head"><h3>Identificação</h3></div>
+      <div class="field"><label>Responsável pela vistoria</label><div>${escapeHTML(insp.responsavelVistoria||'—')}</div></div>
+      <div class="field"><label>Responsável da base presente</label><div>${escapeHTML(insp.responsavelBaseNome||'—')}</div></div>
+    </div>
+  `;
+
+  if(insp.carriedActions && insp.carriedActions.length){
+    html += `<div class="section"><div class="section-head"><h3>Ações verificadas nesta vistoria</h3></div>`;
+    insp.carriedActions.forEach(a=>{
+      const label = !a.reviewed ? 'Não verificado' : (a.status==='Concluído' ? 'Corrigido' : 'Ainda pendente');
+      const color = !a.reviewed ? 'var(--graphite-soft)' : (a.status==='Concluído' ? 'var(--moss)' : 'var(--clay)');
+      html += `<div class="item">
+        <div class="item-q" style="margin-bottom:5px;">${escapeHTML(a.title)}</div>
+        <div style="font-weight:700;color:${color};font-size:13px;">${label}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  insp.sections.forEach(sec=>{
+    html += `<div class="section"><div class="section-head"><h3>${escapeHTML(sec.title)}</h3></div>`;
+    sec.items.forEach(it=>{
+      const flagged = it.answer && it.answer!=='N/A' && it.answer!==it.positive;
+      const color = it.answer==null ? 'var(--graphite-soft)' : (it.answer==='N/A' ? 'var(--graphite-soft)' : (flagged?'var(--clay)':'var(--moss)'));
+      let trend = '';
+      if(it.previousAnswer && it.answer && it.answer!=='N/A' && it.previousAnswer!=='N/A'){
+        const wasFlagged = it.previousAnswer !== it.positive;
+        if(wasFlagged && !flagged) trend = `<span style="color:var(--moss);font-weight:700;font-size:12px;margin-left:8px;">▲ melhorou</span>`;
+        else if(!wasFlagged && flagged) trend = `<span style="color:var(--clay);font-weight:700;font-size:12px;margin-left:8px;">▼ piorou</span>`;
+        else if(wasFlagged && flagged) trend = `<span style="color:var(--amber);font-weight:700;font-size:12px;margin-left:8px;">= ainda pendente</span>`;
+      }
+      html += `<div class="item">
+        <div class="item-q">${escapeHTML(it.text)}</div>
+        <div style="font-weight:700;color:${color};font-size:13.5px;">${it.answer || 'Não respondido'}${trend}</div>
+        ${it.obs?`<div style="font-size:13px;color:var(--graphite-soft);margin-top:5px;">${escapeHTML(it.obs)}</div>`:''}
+        ${it.photos.length?`<div class="thumbs">${it.photos.map(p=>`<div class="thumb"><img src="${p}"></div>`).join('')}</div>`:''}
+      </div>`;
+    });
+    html += `</div>`;
+  });
+
+  if(insp.analiseCritica){
+    html += `<div class="section"><div class="section-head"><h3>Análise crítica e conclusão</h3></div><div class="field">${escapeHTML(insp.analiseCritica).replace(/\n/g,'<br>')}</div></div>`;
+  }
+
+  if(insp.fotosGerais.length){
+    html += `<div class="section"><div class="section-head"><h3>Relatório fotográfico</h3></div><div class="field"><div class="thumbs">${insp.fotosGerais.map(p=>`<div class="thumb" style="width:80px;height:80px;"><img src="${p}"></div>`).join('')}</div></div></div>`;
+  }
+
+  if(insp.acoes.length){
+    html += `<div class="section"><div class="section-head"><h3>Ações e prazos</h3></div>`;
+    insp.acoes.forEach(a=>{
+      html += `<div class="action-item ${a.status==='Concluído'?'done':''}">
+        <div class="cb ${a.status==='Concluído'?'done':''}" data-toggle-local="${a.id}">${a.status==='Concluído'?'✓':''}</div>
+        <div class="body">
+          <div class="title">${escapeHTML(a.title)}</div>
+          <div class="meta"><span class="prio prio-${a.prioridade}">${a.prioridade}</span><span>Prazo: ${fmtDateOnly(a.prazo)}</span><span>${escapeHTML(a.responsavel||'')}</span></div>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  html += unitHistoryHTML(insp.unit, insp.id);
+
+  c.innerHTML = html;
+  c.querySelectorAll('[data-toggle-local]').forEach(el=>el.addEventListener('click', async ()=>{
+    const a = insp.acoes.find(x=>x.id===el.dataset.toggleLocal);
+    a.status = a.status==='Concluído' ? 'Aberto' : 'Concluído';
+    await persistInspection(insp, {silent:true});
+    S.actionsIndex = await loadActionsIndex();
+    renderDetail(c);
+  }));
+
+  document.querySelectorAll('#app > .sticky-save').forEach(el=>el.remove());
+  const bar = document.createElement('div');
+  bar.className='sticky-save';
+  bar.innerHTML = `
+    <button class="btn btn-ghost" id="btn-edit">Editar</button>
+    <button class="btn btn-primary btn-block" id="btn-share">${ICON.share} Compartilhar PDF</button>
+  `;
+  document.getElementById('app').appendChild(bar);
+  document.getElementById('btn-edit').addEventListener('click', ()=>navigate('form', {current:insp, editing:true}));
+  document.getElementById('btn-share').addEventListener('click', ()=>exportPDF(insp));
+}
+
+/* ============================= RENDER: SETTINGS ============================= */
+
+function unitGroupHTML(type, label){
+  const list = S.settings.units.filter(u=>u.type===type);
+  return `
+    <div style="margin-bottom:12px;">
+      <div class="mono" style="font-size:11px;color:var(--graphite-soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:7px;">${label}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        ${list.map(u=>`<div class="unit-tag">${escapeHTML(u.name)}<span class="x" data-rmunit="${escapeAttr(u.name)}">✕</span></div>`).join('') || '<span style="color:var(--graphite-soft);font-size:13px;">Nenhuma</span>'}
+      </div>
+    </div>`;
+}
+
+function renderSettings(c){
+  const backendInfo = STORAGE_BACKEND==='cloud'
+    ? { color:'var(--moss)', label:'Salvando na sua conta Claude', detail:'Os dados ficam disponíveis sempre que você abrir esta vistoria dentro do Claude, em qualquer aparelho.' }
+    : STORAGE_BACKEND==='local'
+    ? { color:'var(--amber)', label:'Salvando apenas neste navegador', detail:'Este arquivo foi aberto fora do Claude, então os dados ficam guardados só neste celular/navegador. Não apague os dados do navegador e evite usar em aba anônima. Não sincroniza com outros aparelhos.' }
+    : { color:'var(--clay)', label:'Não foi possível salvar dados', detail:'Este navegador está bloqueando o armazenamento (ex: aba anônima). Abra em uma aba normal ou dentro do Claude.' };
+  let html = `
+    <div class="section">
+      <div class="field" style="display:flex;gap:10px;align-items:flex-start;">
+        <div style="width:9px;height:9px;border-radius:50%;background:${backendInfo.color};margin-top:5px;flex:none;"></div>
+        <div>
+          <div style="font-weight:700;font-size:13.5px;">${backendInfo.label}</div>
+          <div style="font-size:12px;color:var(--graphite-soft);margin-top:2px;">${backendInfo.detail}</div>
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-head"><h3>Unidades operacionais</h3></div>
+      <div class="field">
+        ${unitGroupHTML('tratamento','Tratamento de resíduos')}
+        ${unitGroupHTML('transbordo','Transbordo')}
+        <div style="display:flex;gap:8px;margin-top:6px;">
+          <input type="text" id="s-newunit" placeholder="Nome da unidade">
+          <select id="s-newtype" style="width:150px;flex:none;">
+            <option value="tratamento">Tratamento</option>
+            <option value="transbordo">Transbordo</option>
+          </select>
+          <button class="btn btn-primary btn-sm" id="s-addunit">${ICON.plus}</button>
+        </div>
+        <p style="font-size:11.5px;color:var(--graphite-soft);margin:8px 0 0;">Unidades de transbordo recebem um checklist sem a etapa de tratamento (ciclos de autoclave e temperatura da caixa de efluentes).</p>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-head"><h3>Responsável padrão</h3></div>
+      <div class="field">
+        <label>Nome exibido automaticamente como vistoriador</label>
+        <input type="text" id="s-resp" value="${escapeAttr(S.settings.defaultResponsavel)}" placeholder="Ex: Fernando José de Almeida Moreira">
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-head"><h3>Backup do histórico</h3></div>
+      <div class="field">
+        <p style="font-size:13px;color:var(--graphite-soft);margin:0 0 10px;">${S.index.length} vistoria(s) neste aparelho. Exporte um arquivo de backup para guardar com segurança ou transferir o histórico para outro aparelho/endereço.</p>
+        <button class="btn btn-primary btn-block" id="s-export">Exportar backup</button>
+        <label class="btn btn-ghost btn-block" style="margin-top:8px;">Importar backup
+          <input type="file" accept=".json,application/json" id="s-import" style="display:none">
+        </label>
+        <p style="font-size:11.5px;color:var(--graphite-soft);margin:8px 0 0;">A importação soma ao que já existe — vistorias repetidas não são duplicadas.</p>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-head"><h3>Dados</h3></div>
+      <div class="field">
+        <p style="font-size:13px;color:var(--graphite-soft);margin:0 0 10px;">Os dados das vistorias ficam salvos neste dispositivo/conta e não são compartilhados com outras pessoas.</p>
+        <button class="btn btn-danger btn-block" id="s-wipe">Apagar todas as vistorias</button>
+      </div>
+    </div>
+  `;
+  c.innerHTML = html;
+
+  document.getElementById('s-export').addEventListener('click', exportBackup);
+  document.getElementById('s-import').addEventListener('change', async (e)=>{
+    const f = e.target.files[0];
+    if(!f) return;
+    await importBackup(f);
+    renderSettings(c);
+  });
+
+  document.getElementById('s-addunit').addEventListener('click', async ()=>{
+    const inp = document.getElementById('s-newunit');
+    const typeSel = document.getElementById('s-newtype');
+    const v = inp.value.trim();
+    if(!v) return;
+    if(!S.settings.units.some(u=>u.name===v)) S.settings.units.push({name:v, type:typeSel.value});
+    await saveSettings(S.settings);
+    renderSettings(c);
+  });
+  c.querySelectorAll('[data-rmunit]').forEach(x=>x.addEventListener('click', async ()=>{
+    S.settings.units = S.settings.units.filter(u=>u.name!==x.dataset.rmunit);
+    await saveSettings(S.settings);
+    renderSettings(c);
+  }));
+  document.getElementById('s-resp').addEventListener('change', async (e)=>{
+    S.settings.defaultResponsavel = e.target.value;
+    await saveSettings(S.settings);
+  });
+  document.getElementById('s-wipe').addEventListener('click', ()=>{
+    openModal(`
+      <h3>Apagar tudo?</h3>
+      <p style="color:var(--graphite-soft);font-size:14px;">Todas as vistorias, fotos e ações cadastradas serão removidas permanentemente deste app.</p>
+      <div style="display:flex;gap:10px;margin-top:14px;">
+        <button class="btn btn-ghost btn-block" id="m-cancel">Cancelar</button>
+        <button class="btn btn-danger btn-block" id="m-confirm">Apagar tudo</button>
+      </div>
+    `);
+    document.getElementById('m-cancel').addEventListener('click', closeModal);
+    document.getElementById('m-confirm').addEventListener('click', async ()=>{
+      for(const i of S.index){ await safeDelete(keyInsp(i.id)); }
+      await saveIndex([]); await saveActionsIndex([]);
+      S.index=[]; S.actionsIndex=[];
+      closeModal(); navigate('home'); toast('Todos os dados foram apagados');
+    });
+  });
+}
+
+/* ============================= MODAL ============================= */
+
+function openModal(innerHTML){
+  const bg = document.createElement('div');
+  bg.className='modal-bg'; bg.id='modal-bg';
+  bg.innerHTML = `<div class="modal">${innerHTML}</div>`;
+  bg.addEventListener('click', e=>{ if(e.target.id==='modal-bg') closeModal(); });
+  document.body.appendChild(bg);
+}
+function closeModal(){ const m=document.getElementById('modal-bg'); if(m) m.remove(); }
+
+/* ============================= UTIL ============================= */
+
+function escapeHTML(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function escapeAttr(s){ return escapeHTML(s); }
+
+boot();
+})();
+</script>
+</body>
+</html>
