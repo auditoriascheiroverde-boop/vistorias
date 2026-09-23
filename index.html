@@ -104,6 +104,7 @@
     border:none;border-radius:11px;font-family:'Inter',sans-serif;font-weight:600;font-size:14.5px;
     padding:12px 18px;cursor:pointer;
   }
+  .btn svg{width:17px;height:17px;flex:none;}
   .btn-primary{background:var(--forest);color:#fff;}
   .btn-primary:active{background:var(--forest-dark);}
   .btn-ghost{background:transparent;color:var(--forest);border:1.5px solid var(--line);}
@@ -294,6 +295,11 @@ function emptyInspection(unit, responsavel, unitType){
     acoes: [],
     previousInspectionId: null,
     carriedActions: [],
+    acompanhanteNome: '',
+    acompanhanteCargo: '',
+    acompanhanteAssinatura: null,
+    assinaturaVistoriador: null,
+    destinatarios: (S.settings && S.settings.emailDestinatarios) || '',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -399,10 +405,18 @@ async function loadSettings(){
       // migrate older format where units was a plain array of strings
       parsed.units = (parsed.units || []).map(u => typeof u === 'string' ? { name:u, type:'tratamento' } : u);
       if(parsed.units.length === 0) parsed.units = DEFAULT_UNITS.slice();
-      return parsed;
+      return withSettingsDefaults(parsed);
     }catch(e){}
   }
-  return { units: DEFAULT_UNITS.slice(), defaultResponsavel:'' };
+  return withSettingsDefaults({ units: DEFAULT_UNITS.slice(), defaultResponsavel:'' });
+}
+function withSettingsDefaults(s){
+  if(s.vistoriadorNome == null) s.vistoriadorNome = 'Fernando J de Almeida Moreira';
+  if(s.vistoriadorCargo == null) s.vistoriadorCargo = 'Responsável Técnico';
+  if(s.vistoriadorAssinatura === undefined) s.vistoriadorAssinatura = null;
+  if(s.emailDestinatarios == null) s.emailDestinatarios = '';
+  if(!s.defaultResponsavel) s.defaultResponsavel = s.vistoriadorNome;
+  return s;
 }
 async function saveSettings(s){ await safeSet(KEY_SETTINGS, JSON.stringify(s)); }
 
@@ -590,7 +604,107 @@ function generatePDFBlob(insp){
     hist.forEach(i=> write(`${fmtDate(i.date)} — ${i.pct}% conforme`, 9.3, {indent:6}));
   }
 
+  // Signatures, side by side
+  y += 14;
+  ensureSpace(150);
+  write('ASSINATURAS', 11.5, {bold:true, color:'#1E5B3A'});
+  y += 6;
+  const colW = (W - 2*M - 30) / 2;
+  const sigs = [
+    { label:'Vistoriador', img:insp.assinaturaVistoriador, name:S.settings.vistoriadorNome, role:S.settings.vistoriadorCargo },
+    { label:'Acompanhante', img:insp.acompanhanteAssinatura, name:insp.acompanhanteNome||'—', role:insp.acompanhanteCargo||'' }
+  ];
+  const top = y;
+  sigs.forEach((sg,i)=>{
+    const x = M + i*(colW+30);
+    if(sg.img){ try{ doc.addImage(sg.img,'JPEG', x+colW*0.1, top, colW*0.8, 62); }catch(e){} }
+    doc.setDrawColor(40,40,35); doc.setLineWidth(0.7);
+    doc.line(x, top+70, x+colW, top+70);
+    doc.setTextColor(35,40,31);
+    doc.setFont('helvetica','bold'); doc.setFontSize(9.8);
+    doc.text(sg.name, x+colW/2, top+84, {align:'center', maxWidth:colW});
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.8);
+    doc.text(`${sg.label}${sg.role?' — '+sg.role:''}`, x+colW/2, top+97, {align:'center', maxWidth:colW});
+  });
+  y = top + 110;
+
   return doc.output('blob');
+}
+
+function pdfFilename(insp){
+  const safeUnit = (insp.unit||'unidade').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]+/g,'_');
+  return `vistoria_${safeUnit}_${(insp.date||'').slice(0,10)}.pdf`;
+}
+
+function parseEmails(str){
+  return (str||'').split(/[,;\s]+/).map(e=>e.trim()).filter(e=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e));
+}
+
+function emailSubject(insp){
+  return `Relatório de Vistoria — ${insp.unit} — ${fmtDate(insp.date)}`;
+}
+function emailBody(insp){
+  const sc = computeScore(insp);
+  const open = insp.acoes.filter(a=>a.status!=='Concluído').length;
+  return `Prezados,\n\nSegue em anexo o relatório da vistoria realizada na unidade ${insp.unit} em ${fmtDate(insp.date)}.\n\n` +
+    `Resultado: ${sc.conforme}/${sc.total} itens conformes (${sc.pct}%), ${sc.flagged} item(ns) sinalizado(s) e ${open} ação(ões) em aberto.\n\n` +
+    `Atenciosamente,\n${S.settings.vistoriadorNome}\n${S.settings.vistoriadorCargo}\nCheiro Verde Ambiental`;
+}
+
+function openSendModal(insp){
+  const emails = parseEmails(insp.destinatarios);
+  openModal(`
+    <h3>Vistoria salva ✅</h3>
+    <p style="color:var(--graphite-soft);font-size:13.5px;margin:4px 0 12px;">Deseja enviar o relatório em PDF por e-mail agora?</p>
+    <div style="background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px;">
+      <b>Destinatários:</b> ${emails.length ? escapeHTML(emails.join(', ')) : '<span style="color:var(--graphite-soft)">nenhum informado</span>'}
+    </div>
+    <button class="btn btn-primary btn-block" id="send-mail" style="margin-top:14px;">${ICON.mail} Enviar por e-mail</button>
+    <button class="btn btn-ghost btn-block" id="send-later" style="margin-top:8px;">Agora não</button>
+  `);
+  document.getElementById('send-mail').addEventListener('click', ()=>{ closeModal(); sendByEmail(insp); });
+  document.getElementById('send-later').addEventListener('click', closeModal);
+}
+
+function sendByEmail(insp){
+  if(!(window.jspdf && window.jspdf.jsPDF)){ toast('⚠️ Gerador de PDF indisponível — verifique a conexão.'); return; }
+  let blob;
+  try{ blob = generatePDFBlob(insp); }catch(e){ console.error(e); toast('Não foi possível gerar o PDF.'); return; }
+  const filename = pdfFilename(insp);
+  const emails = parseEmails(insp.destinatarios);
+  const subject = emailSubject(insp), body = emailBody(insp);
+
+  // Copy recipients so they can be pasted into the "To" field of Mail
+  if(emails.length && navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(emails.join(', ')).catch(()=>{});
+  }
+
+  // Preferred: share sheet with the PDF attached -> user picks Mail/Gmail/Outlook
+  try{
+    const file = new File([blob], filename, {type:'application/pdf'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      navigator.share({ files:[file], title:subject, text:body })
+        .then(()=>{})
+        .catch(e=>{ if(!(e && e.name==='AbortError')) mailtoFallback(blob, filename, emails, subject, body); });
+      if(emails.length) toast('E-mails copiados — no Mail, cole no campo "Para"');
+      return;
+    }
+  }catch(e){}
+
+  mailtoFallback(blob, filename, emails, subject, body);
+}
+
+function mailtoFallback(blob, filename, emails, subject, body){
+  // Browsers can't attach files via mailto: download the PDF, then open a pre-filled e-mail
+  try{
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download=filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 8000);
+  }catch(e){}
+  const href = `mailto:${encodeURIComponent(emails.join(','))}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body + '\n\n(Anexe o PDF baixado: ' + filename + ')')}`;
+  setTimeout(()=>{ window.location.href = href; }, 600);
+  toast('PDF baixado — anexe-o no e-mail que vai abrir');
 }
 
 async function exportPDF(insp){
@@ -688,6 +802,12 @@ async function importBackup(file){
     if(!S.settings.defaultResponsavel && data.settings.defaultResponsavel){
       S.settings.defaultResponsavel = data.settings.defaultResponsavel;
     }
+    if(!S.settings.vistoriadorAssinatura && data.settings.vistoriadorAssinatura){
+      S.settings.vistoriadorAssinatura = data.settings.vistoriadorAssinatura;
+    }
+    if(!S.settings.emailDestinatarios && data.settings.emailDestinatarios){
+      S.settings.emailDestinatarios = data.settings.emailDestinatarios;
+    }
     await saveSettings(S.settings);
   }
 
@@ -783,6 +903,8 @@ const ICON = {
   camera:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13.5" r="3.3"/></svg>',
   settings:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>',
   print:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>',
+  gallery:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>',
+  mail:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 6l-10 7L2 6"/></svg>',
   share:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg>',
   trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>',
   alert:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
@@ -1184,7 +1306,7 @@ function renderForm(c){
         </div>
         <div class="thumbs" data-thumbs-si="${si}" data-thumbs-ii="${ii}">
           ${it.photos.map((p,pi)=>`<div class="thumb"><img src="${p}"><div class="rm" data-rmphoto-si="${si}" data-rmphoto-ii="${ii}" data-pi="${pi}">✕</div></div>`).join('')}
-          <label class="photo-add">${ICON.camera}<input type="file" accept="image/*" capture="environment" multiple style="display:none" data-addphoto-si="${si}" data-addphoto-ii="${ii}"></label>
+          <label class="photo-add" title="Câmera">${ICON.camera}<input type="file" accept="image/*" capture="environment" style="display:none" data-addphoto-si="${si}" data-addphoto-ii="${ii}"></label><label class="photo-add" title="Galeria">${ICON.gallery}<input type="file" accept="image/*" multiple style="display:none" data-addphoto-si="${si}" data-addphoto-ii="${ii}"></label>
         </div>
         <div class="item-actions-row">
           <button type="button" class="btn btn-sm btn-ghost" data-quickaction-si="${si}" data-quickaction-ii="${ii}">+ Ação / prazo</button>
@@ -1210,8 +1332,32 @@ function renderForm(c){
     <div class="field">
       <div class="thumbs">
         ${insp.fotosGerais.map((p,pi)=>`<div class="thumb"><img src="${p}"><div class="rm" data-rmgeral="${pi}">✕</div></div>`).join('')}
-        <label class="photo-add">${ICON.camera}<input type="file" accept="image/*" capture="environment" multiple style="display:none" id="f-addgeral"></label>
+        <label class="photo-add" title="Câmera">${ICON.camera}<input type="file" accept="image/*" capture="environment" style="display:none" class="f-addgeral"></label><label class="photo-add" title="Galeria">${ICON.gallery}<input type="file" accept="image/*" multiple style="display:none" class="f-addgeral"></label>
       </div>
+    </div>
+  </div>`;
+
+  const vistSig = insp.assinaturaVistoriador || S.settings.vistoriadorAssinatura;
+  html += `<div class="section">
+    <div class="section-head"><h3>Assinaturas</h3></div>
+    <div class="field">
+      ${signatureBlockHTML({label:'Vistoriador', name:S.settings.vistoriadorNome, role:S.settings.vistoriadorCargo, img:vistSig, btnId:'sig-vist', editable:true})}
+      ${!vistSig?'<p style="font-size:11.5px;color:var(--graphite-soft);margin:-4px 0 10px;">Dica: salve sua assinatura em Configurações para ela entrar automaticamente em todas as vistorias.</p>':''}
+      <label>Acompanhante — nome</label>
+      <input type="text" id="f-acomp-nome" placeholder="Nome de quem acompanhou a vistoria" value="${escapeAttr(insp.acompanhanteNome||'')}">
+      <label style="margin-top:10px;">Acompanhante — cargo</label>
+      <input type="text" id="f-acomp-cargo" placeholder="Ex: Responsável da base, Encarregado" value="${escapeAttr(insp.acompanhanteCargo||'')}">
+      <div style="margin-top:12px;">
+        ${signatureBlockHTML({label:'Acompanhante', name:insp.acompanhanteNome||'Nome do acompanhante', role:insp.acompanhanteCargo||'', img:insp.acompanhanteAssinatura, btnId:'sig-acomp', clearId:'sig-acomp-clear', editable:true})}
+      </div>
+    </div>
+  </div>`;
+
+  html += `<div class="section">
+    <div class="section-head"><h3>Envio do relatório</h3></div>
+    <div class="field">
+      <label>E-mails dos destinatários (separe por vírgula)</label>
+      <input type="text" inputmode="email" id="f-dest" placeholder="ex: fulano@empresa.com, ciclano@empresa.com" value="${escapeAttr(insp.destinatarios||'')}">
     </div>
   </div>`;
 
@@ -1236,10 +1382,14 @@ function renderForm(c){
   `;
   document.getElementById('app').appendChild(bar);
   document.getElementById('btn-save').addEventListener('click', async ()=>{
+    if(!S.current.assinaturaVistoriador && S.settings.vistoriadorAssinatura){
+      S.current.assinaturaVistoriador = S.settings.vistoriadorAssinatura;
+    }
     await persistInspection(S.current);
     S.index = await loadIndex();
     S.actionsIndex = await loadActionsIndex();
     navigate('detail', {current:S.current, editing:false});
+    openSendModal(S.current);
   });
   const delBtn = document.getElementById('btn-del');
   if(delBtn) delBtn.addEventListener('click', confirmDeleteCurrent);
@@ -1252,6 +1402,41 @@ function scheduleAutosave(){
 
 function attachFormListeners(c){
   const insp = S.current;
+
+  const sigVist = document.getElementById('sig-vist');
+  if(sigVist) sigVist.addEventListener('click', ()=>{
+    openSignaturePad('Assinatura do vistoriador', `${S.settings.vistoriadorNome} — ${S.settings.vistoriadorCargo}`, async (data)=>{
+      insp.assinaturaVistoriador = data;
+      if(!S.settings.vistoriadorAssinatura){
+        S.settings.vistoriadorAssinatura = data;
+        await saveSettings(S.settings);
+        toast('Assinatura salva como padrão para as próximas vistorias');
+      }
+      scheduleAutosave(); renderForm(c);
+    });
+  });
+  const sigAcomp = document.getElementById('sig-acomp');
+  if(sigAcomp) sigAcomp.addEventListener('click', ()=>{
+    const who = [insp.acompanhanteNome, insp.acompanhanteCargo].filter(Boolean).join(' — ');
+    openSignaturePad('Assinatura do acompanhante', who || 'Peça ao acompanhante para assinar abaixo.', (data)=>{
+      insp.acompanhanteAssinatura = data; scheduleAutosave(); renderForm(c);
+    });
+  });
+  const sigAcompClear = document.getElementById('sig-acomp-clear');
+  if(sigAcompClear) sigAcompClear.addEventListener('click', ()=>{ insp.acompanhanteAssinatura=null; scheduleAutosave(); renderForm(c); });
+
+  const acNome = document.getElementById('f-acomp-nome');
+  if(acNome){
+    acNome.addEventListener('input', e=>{ insp.acompanhanteNome=e.target.value; scheduleAutosave(); });
+    acNome.addEventListener('change', ()=>renderForm(c));
+  }
+  const acCargo = document.getElementById('f-acomp-cargo');
+  if(acCargo){
+    acCargo.addEventListener('input', e=>{ insp.acompanhanteCargo=e.target.value; scheduleAutosave(); });
+    acCargo.addEventListener('change', ()=>renderForm(c));
+  }
+  const dest = document.getElementById('f-dest');
+  if(dest) dest.addEventListener('input', e=>{ insp.destinatarios=e.target.value; scheduleAutosave(); });
 
   c.querySelectorAll('[data-carried-review]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -1278,7 +1463,15 @@ function attachFormListeners(c){
   const respEl = document.getElementById('f-resp');
   if(respEl) respEl.addEventListener('input', e=>{ insp.responsavelVistoria=e.target.value; scheduleAutosave(); });
   const respBaseEl = document.getElementById('f-respbase');
-  if(respBaseEl) respBaseEl.addEventListener('input', e=>{ insp.responsavelBaseNome=e.target.value; scheduleAutosave(); });
+  if(respBaseEl){
+    respBaseEl.addEventListener('input', e=>{
+      const prev = insp.responsavelBaseNome;
+      insp.responsavelBaseNome = e.target.value;
+      if(!insp.acompanhanteNome || insp.acompanhanteNome === prev) insp.acompanhanteNome = e.target.value;
+      scheduleAutosave();
+    });
+    respBaseEl.addEventListener('change', ()=>renderForm(c));
+  }
   const analiseEl = document.getElementById('f-analise');
   if(analiseEl) analiseEl.addEventListener('input', e=>{ insp.analiseCritica=e.target.value; scheduleAutosave(); });
 
@@ -1319,14 +1512,13 @@ function attachFormListeners(c){
     });
   });
 
-  const addGeral = document.getElementById('f-addgeral');
-  if(addGeral) addGeral.addEventListener('change', async ()=>{
+  c.querySelectorAll('.f-addgeral').forEach(addGeral=>addGeral.addEventListener('change', async ()=>{
     for(const file of addGeral.files){
       try{ const d = await fileToCompressedDataURL(file); insp.fotosGerais.push(d); }
       catch(e){ toast('Não foi possível anexar a foto'); }
     }
     scheduleAutosave(); renderForm(c);
-  });
+  }));
   c.querySelectorAll('[data-rmgeral]').forEach(x=>{
     x.addEventListener('click', ()=>{ insp.fotosGerais.splice(+x.dataset.rmgeral,1); scheduleAutosave(); renderForm(c); });
   });
@@ -1466,6 +1658,12 @@ function renderDetail(c){
     html += `</div>`;
   }
 
+  const vistSigD = insp.assinaturaVistoriador;
+  html += `<div class="section"><div class="section-head"><h3>Assinaturas</h3></div><div class="field">
+    ${signatureBlockHTML({label:'Vistoriador', name:S.settings.vistoriadorNome, role:S.settings.vistoriadorCargo, img:vistSigD, editable:false})}
+    ${signatureBlockHTML({label:'Acompanhante', name:insp.acompanhanteNome||'—', role:insp.acompanhanteCargo||'', img:insp.acompanhanteAssinatura, editable:false})}
+  </div></div>`;
+
   html += unitHistoryHTML(insp.unit, insp.id);
 
   c.innerHTML = html;
@@ -1482,11 +1680,13 @@ function renderDetail(c){
   bar.className='sticky-save';
   bar.innerHTML = `
     <button class="btn btn-ghost" id="btn-edit">Editar</button>
-    <button class="btn btn-primary btn-block" id="btn-share">${ICON.share} Compartilhar PDF</button>
+    <button class="btn btn-ghost" id="btn-share" title="Compartilhar PDF">${ICON.share} PDF</button>
+    <button class="btn btn-primary btn-block" id="btn-mail">${ICON.mail} Enviar por e-mail</button>
   `;
   document.getElementById('app').appendChild(bar);
   document.getElementById('btn-edit').addEventListener('click', ()=>navigate('form', {current:insp, editing:true}));
   document.getElementById('btn-share').addEventListener('click', ()=>exportPDF(insp));
+  document.getElementById('btn-mail').addEventListener('click', ()=>sendByEmail(insp));
 }
 
 /* ============================= RENDER: SETTINGS ============================= */
@@ -1535,10 +1735,23 @@ function renderSettings(c){
       </div>
     </div>
     <div class="section">
-      <div class="section-head"><h3>Responsável padrão</h3></div>
+      <div class="section-head"><h3>Vistoriador e assinatura</h3></div>
       <div class="field">
-        <label>Nome exibido automaticamente como vistoriador</label>
-        <input type="text" id="s-resp" value="${escapeAttr(S.settings.defaultResponsavel)}" placeholder="Ex: Fernando José de Almeida Moreira">
+        <label>Nome</label>
+        <input type="text" id="s-vnome" value="${escapeAttr(S.settings.vistoriadorNome)}">
+        <label style="margin-top:10px;">Cargo</label>
+        <input type="text" id="s-vcargo" value="${escapeAttr(S.settings.vistoriadorCargo)}">
+        <div style="margin-top:12px;">
+          ${signatureBlockHTML({label:'Assinatura padrão do vistoriador', name:S.settings.vistoriadorNome, role:S.settings.vistoriadorCargo, img:S.settings.vistoriadorAssinatura, btnId:'s-sig', clearId:'s-sig-clear', editable:true})}
+        </div>
+        <p style="font-size:11.5px;color:var(--graphite-soft);margin:0;">Essa assinatura entra automaticamente em todas as novas vistorias. Vistorias já salvas mantêm a assinatura que tinham.</p>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-head"><h3>Destinatários padrão do relatório</h3></div>
+      <div class="field">
+        <label>E-mails que já vêm preenchidos em toda nova vistoria (separe por vírgula)</label>
+        <input type="text" inputmode="email" id="s-emails" value="${escapeAttr(S.settings.emailDestinatarios)}" placeholder="ex: diretoria@cheiroverde.com.br">
       </div>
     </div>
     <div class="section">
@@ -1584,9 +1797,31 @@ function renderSettings(c){
     await saveSettings(S.settings);
     renderSettings(c);
   }));
-  document.getElementById('s-resp').addEventListener('change', async (e)=>{
-    S.settings.defaultResponsavel = e.target.value;
-    await saveSettings(S.settings);
+  document.getElementById('s-vnome').addEventListener('change', async (e)=>{
+    S.settings.vistoriadorNome = e.target.value.trim();
+    S.settings.defaultResponsavel = S.settings.vistoriadorNome;
+    await saveSettings(S.settings); renderSettings(c);
+  });
+  document.getElementById('s-vcargo').addEventListener('change', async (e)=>{
+    S.settings.vistoriadorCargo = e.target.value.trim();
+    await saveSettings(S.settings); renderSettings(c);
+  });
+  document.getElementById('s-emails').addEventListener('change', async (e)=>{
+    S.settings.emailDestinatarios = parseEmails(e.target.value).join(', ');
+    await saveSettings(S.settings); renderSettings(c);
+    toast('Destinatários padrão salvos');
+  });
+  document.getElementById('s-sig').addEventListener('click', ()=>{
+    openSignaturePad('Sua assinatura padrão', `${S.settings.vistoriadorNome} — ${S.settings.vistoriadorCargo}`, async (data)=>{
+      S.settings.vistoriadorAssinatura = data;
+      await saveSettings(S.settings); renderSettings(c);
+      toast('Assinatura padrão salva');
+    });
+  });
+  const sClear = document.getElementById('s-sig-clear');
+  if(sClear) sClear.addEventListener('click', async ()=>{
+    S.settings.vistoriadorAssinatura = null;
+    await saveSettings(S.settings); renderSettings(c);
   });
   document.getElementById('s-wipe').addEventListener('click', ()=>{
     openModal(`
@@ -1617,6 +1852,71 @@ function openModal(innerHTML){
   document.body.appendChild(bg);
 }
 function closeModal(){ const m=document.getElementById('modal-bg'); if(m) m.remove(); }
+
+/* ============================= SIGNATURE PAD ============================= */
+
+function openSignaturePad(title, subtitle, onSave){
+  openModal(`
+    <h3>${escapeHTML(title)}</h3>
+    <p style="color:var(--graphite-soft);font-size:13px;margin:4px 0 10px;">${escapeHTML(subtitle||'Assine com o dedo no quadro abaixo.')}</p>
+    <canvas id="sig-canvas" style="width:100%;height:200px;background:#fff;border:1.5px dashed var(--line);border-radius:10px;touch-action:none;display:block;"></canvas>
+    <div style="display:flex;gap:10px;margin-top:12px;">
+      <button class="btn btn-ghost" id="sig-clear">Limpar</button>
+      <button class="btn btn-ghost" id="sig-cancel">Cancelar</button>
+      <button class="btn btn-primary btn-block" id="sig-ok">Confirmar</button>
+    </div>
+  `);
+  const cv = document.getElementById('sig-canvas');
+  const ratio = Math.max(window.devicePixelRatio||1, 1);
+  const rect = cv.getBoundingClientRect();
+  cv.width = rect.width * ratio; cv.height = rect.height * ratio;
+  const ctx = cv.getContext('2d');
+  ctx.scale(ratio, ratio);
+  ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#1a1d17';
+  let drawing = false, hasInk = false, last = null;
+  const pos = e => { const r = cv.getBoundingClientRect(); return { x:e.clientX - r.left, y:e.clientY - r.top }; };
+  cv.addEventListener('pointerdown', e=>{ drawing=true; last=pos(e); cv.setPointerCapture(e.pointerId); e.preventDefault(); });
+  cv.addEventListener('pointermove', e=>{
+    if(!drawing) return;
+    const p = pos(e);
+    ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke();
+    last = p; hasInk = true; e.preventDefault();
+  });
+  const stop = ()=>{ drawing=false; };
+  cv.addEventListener('pointerup', stop); cv.addEventListener('pointercancel', stop);
+  document.getElementById('sig-clear').addEventListener('click', ()=>{ ctx.clearRect(0,0,cv.width,cv.height); hasInk=false; });
+  document.getElementById('sig-cancel').addEventListener('click', closeModal);
+  document.getElementById('sig-ok').addEventListener('click', ()=>{
+    if(!hasInk){ toast('Faça a assinatura antes de confirmar'); return; }
+    const out = document.createElement('canvas');
+    out.width = cv.width; out.height = cv.height;
+    const o = out.getContext('2d');
+    o.fillStyle = '#fff'; o.fillRect(0,0,out.width,out.height);
+    o.drawImage(cv,0,0);
+    const data = out.toDataURL('image/jpeg', 0.8);
+    closeModal();
+    onSave(data);
+  });
+}
+
+function signatureBlockHTML(opts){
+  // opts: {label, name, role, img, btnId, clearId, editable}
+  return `
+    <div style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;background:#FDFCF9;">
+      <div class="mono" style="font-size:11px;color:var(--graphite-soft);text-transform:uppercase;letter-spacing:.04em;">${escapeHTML(opts.label)}</div>
+      ${opts.img
+        ? `<img src="${opts.img}" style="width:100%;max-height:110px;object-fit:contain;background:#fff;border-radius:6px;margin:8px 0 4px;">`
+        : `<div style="height:70px;display:flex;align-items:center;justify-content:center;color:var(--graphite-soft);font-size:12.5px;border-bottom:1.5px solid var(--graphite-soft);margin:8px 0 4px;">${opts.editable?'Sem assinatura':'Não assinado'}</div>`}
+      <div style="border-top:1px solid var(--graphite);padding-top:5px;text-align:center;">
+        <div style="font-weight:700;font-size:13.5px;">${escapeHTML(opts.name||'—')}</div>
+        <div style="font-size:12px;color:var(--graphite-soft);">${escapeHTML(opts.role||'')}</div>
+      </div>
+      ${opts.editable?`<div style="display:flex;gap:8px;margin-top:10px;">
+        <button type="button" class="btn btn-ghost btn-sm btn-block" id="${opts.btnId}">${opts.img?'Assinar novamente':'Assinar'}</button>
+        ${opts.img && opts.clearId?`<button type="button" class="btn btn-danger btn-sm" id="${opts.clearId}">Remover</button>`:''}
+      </div>`:''}
+    </div>`;
+}
 
 /* ============================= UTIL ============================= */
 
